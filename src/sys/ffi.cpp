@@ -17,7 +17,7 @@ extern "C" {
   struct FfiMkvWriter: public mkvmuxer::IMkvWriter {
   public:
     typedef bool (*WriteFun)(void*, const void*, size_t);
-    typedef int64_t (*GetPositionFun)(const void*);
+    typedef int64_t (*GetPositionFun)(void*);
     typedef bool (*SetPositionFun)(void*, uint64_t);
     typedef void (*ElementStartNotifyFun)(void*, uint64_t, int64_t);
 
@@ -26,7 +26,7 @@ extern "C" {
     SetPositionFun        set_position_         = nullptr;
     ElementStartNotifyFun element_start_notify_ = nullptr;
 
-    void* user_data = nullptr;
+    mutable void* user_data = nullptr;
 
     FfiMkvWriter() = default;
     virtual ~FfiMkvWriter() = default;
@@ -82,7 +82,6 @@ extern "C" {
   }
 
   void mux_delete_writer(MkvWriterPtr writer) {
-
     delete static_cast<FfiMkvWriter*>(writer);
   }
 
