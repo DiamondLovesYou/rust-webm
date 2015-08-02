@@ -8,7 +8,6 @@ pub mod mux {
     use libc::{c_void, size_t};
 
     use std::io::{Write, Seek};
-    use std::marker::PhantomData;
 
     pub struct Writer<T>
         where T: Write + Seek,
@@ -65,10 +64,6 @@ pub mod mux {
             debug_assert!(w.mkv_writer != 0 as *mut _);
             w
         }
-
-        fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
-            self.mkv_writer
-        }
         pub fn unwrap(self) -> T {
             unsafe {
                 ffi::mux::delete_writer(self.mkv_writer);
@@ -78,16 +73,24 @@ pub mod mux {
         }
     }
 
+    #[doc(hidden)]
+    pub trait MkvWriter {
+        fn mkv_writer(&self) -> ffi::mux::WriterMutPtr;
+    }
+    impl<T> MkvWriter for Writer<T>
+        where T: Write + Seek,
+    {
+        fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
+            self.mkv_writer
+        }
+    }
+
     #[derive(Eq, PartialEq, Clone, Copy)]
-    pub struct VideoTrack<'a, 'b>(ffi::mux::SegmentMutPtr,
-                                  ffi::mux::VideoTrackMutPtr,
-                                  PhantomData<&'b Segment<'a>>)
-        where 'a: 'b;
+    pub struct VideoTrack(ffi::mux::SegmentMutPtr,
+                          ffi::mux::VideoTrackMutPtr);
     #[derive(Eq, PartialEq, Clone, Copy)]
-    pub struct AudioTrack<'a, 'b>(ffi::mux::SegmentMutPtr,
-                                  ffi::mux::AudioTrackMutPtr,
-                                  PhantomData<&'b Segment<'a>>)
-        where 'a: 'b;
+    pub struct AudioTrack(ffi::mux::SegmentMutPtr,
+                          ffi::mux::AudioTrackMutPtr);
     pub trait Track {
         fn is_audio(&self) -> bool { false }
         fn is_video(&self) -> bool { false }
@@ -108,22 +111,22 @@ pub mod mux {
         #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr;
     }
-    impl<'a, 'b> Track for VideoTrack<'a, 'b>
-        where 'a: 'b,
-    {
+    impl Track for VideoTrack {
         fn is_video(&self) -> bool { true }
 
+        #[doc(hidden)]
         fn get_segment(&self) -> ffi::mux::SegmentMutPtr { self.0 }
+        #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr {
             unsafe { ffi::mux::video_track_base_mut(self.1) }
         }
     }
-    impl<'a, 'b> Track for AudioTrack<'a, 'b>
-        where 'a: 'b,
-    {
+    impl Track for AudioTrack {
         fn is_audio(&self) -> bool { true }
 
+        #[doc(hidden)]
         fn get_segment(&self) -> ffi::mux::SegmentMutPtr { self.0 }
+        #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr {
             unsafe { ffi::mux::audio_track_base_mut(self.1) }
         }
@@ -156,14 +159,14 @@ pub mod mux {
         }
     }
 
-    pub struct Segment<'a> {
+    pub struct Segment {
         ffi: ffi::mux::SegmentMutPtr,
-        _dest: PhantomData<&'a u8>
     }
 
-    impl<'a> Segment<'a> {
-        pub fn new<T>(dest: &'a Writer<T>) -> Option<Segment<'a>>
-            where T: Write + Seek,
+    impl Segment {
+        /// Note: the supplied writer must have a lifetime larger than the segment.
+        pub fn new<T>(dest: &T) -> Option<Segment>
+            where T: MkvWriter,
         {
             let ffi = unsafe { ffi::mux::new_segment() };
             let success = unsafe {
@@ -173,27 +176,29 @@ pub mod mux {
 
             Some(Segment {
                 ffi: ffi,
-                _dest: PhantomData,
             })
         }
 
-        pub fn add_video_track<'b>(&'b mut self, width: i32, height: i32,
-                                   id: Option<i32>, codec: VideoCodecId) -> VideoTrack<'a, 'b> {
+        pub fn add_video_track(&mut self, width: u32, height: u32,
+                               id: Option<i32>, codec: VideoCodecId) -> VideoTrack
+        {
             let vt = unsafe {
-                ffi::mux::segment_add_video_track(self.ffi, width, height,
+                ffi::mux::segment_add_video_track(self.ffi, width as i32, height as i32,
                                                   id.unwrap_or(0), codec.get_id())
             };
-            VideoTrack(self.ffi, vt, PhantomData)
+            VideoTrack(self.ffi, vt)
         }
-        pub fn add_audio_track<'b>(&'b mut self, sample_rate: i32, channels: i32,
-                                   id: Option<i32>, codec: AudioCodecId) -> AudioTrack<'a, 'b> {
+        pub fn add_audio_track(&mut self, sample_rate: i32, channels: i32,
+                               id: Option<i32>, codec: AudioCodecId) -> AudioTrack {
             let at = unsafe {
                 ffi::mux::segment_add_audio_track(self.ffi, sample_rate, channels,
                                                   id.unwrap_or(0), codec.get_id())
             };
-            AudioTrack(self.ffi, at, PhantomData)
+            AudioTrack(self.ffi, at)
         }
 
+
+        /// After calling, all tracks are freed (ie you can't use them).
         #[allow(unused_mut)]
         pub fn finalize(mut self) -> bool {
             let result = unsafe {
