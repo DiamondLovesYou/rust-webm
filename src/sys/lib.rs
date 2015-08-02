@@ -5,8 +5,7 @@ pub mod mux {
 
     use libc::{c_void, size_t};
 
-    #[repr(C)]
-    pub struct IWriter;
+    pub type IWriter = c_void;
     pub type WriterMutPtr = *mut IWriter;
 
     pub type WriterWriteFn = extern "C" fn(*mut c_void,
@@ -24,19 +23,16 @@ pub mod mux {
     pub const VP8_CODEC_ID: u32 = 0;
     pub const VP9_CODEC_ID: u32 = 1;
 
-    #[repr(C)]
-    pub struct Segment;
+    pub type Segment = c_void;
     pub type SegmentMutPtr = *mut Segment;
 
-    #[repr(C)]
-    pub struct Track;
+    pub type Track = c_void;
     pub type TrackMutPtr = *mut Track;
 
-    #[repr(C)]
-    pub struct VideoTrack;
+    pub type VideoTrack = c_void;
     pub type VideoTrackMutPtr = *mut VideoTrack;
-    #[repr(C)]
-    pub struct AudioTrack;
+
+    pub type AudioTrack = c_void;
     pub type AudioTrackMutPtr = *mut AudioTrack;
 
 
