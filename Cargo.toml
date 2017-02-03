@@ -1,19 +1,21 @@
 [package]
-name = "webm"
-version = "0.2.0"
-authors = ["Richard Diamond <wichard@vitalitystudios.com>"]
-license = "MPL-2.0"
-repository = "https://github.com/DiamondLovesYou/rust-webm"
+authors = [
+    "Richard Diamond <wichard@vitalitystudios.com>",
+    "Kornel Lesiński <kornel@geekhood.net>",
+]
 description = "Rust idiomatic wrapper to libwebm"
-keywords = [ "webm" ]
+keywords = ["webm"]
+license = "MPL-2.0"
+name = "webm-native"
+
+repository = "https://github.com/pornel/rust-webm.git"
+version = "0.4.0"
+
+[dependencies]
+libc = "0.2.20"
+webm-sys-native = { version = "0.3.0", path = "src/sys" }
 
 [lib]
 name = "webm"
 path = "src/lib/lib.rs"
 
-[dependencies.webm-sys]
-path = "src/sys"
-version = "0.1"
-
-[dependencies]
-libc = "*"
