@@ -181,6 +181,13 @@ pub mod mux {
             })
         }
 
+        pub fn set_app_name(&mut self, name: &str) {
+            use std::ffi::CString;
+            unsafe {
+                ffi::mux::mux_set_writing_app(self.ffi, CString::new(name).unwrap().as_ptr());
+            }
+        }
+
         pub fn add_video_track(&mut self, width: u32, height: u32,
                                id: Option<i32>, codec: VideoCodecId) -> VideoTrack
         {
