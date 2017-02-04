@@ -159,14 +159,15 @@ pub mod mux {
         }
     }
 
-    pub struct Segment {
+    pub struct Segment<W> {
         ffi: ffi::mux::SegmentMutPtr,
+        _writer: W,
     }
 
-    impl Segment {
+    impl<W> Segment<W> {
         /// Note: the supplied writer must have a lifetime larger than the segment.
-        pub fn new<T>(dest: &T) -> Option<Segment>
-            where T: MkvWriter,
+        pub fn new(dest: W) -> Option<Self>
+            where W: MkvWriter,
         {
             let ffi = unsafe { ffi::mux::new_segment() };
             let success = unsafe {
@@ -176,6 +177,7 @@ pub mod mux {
 
             Some(Segment {
                 ffi: ffi,
+                _writer: dest,
             })
         }
 
