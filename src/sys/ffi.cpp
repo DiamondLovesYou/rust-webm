@@ -1,11 +1,11 @@
 
-#include "libwebm/mkvmuxer.hpp"
-#include "libwebm/mkvmuxertypes.hpp"
-#include "libwebm/mkvmuxerutil.hpp"
-#include "libwebm/mkvparser.hpp"
-#include "libwebm/mkvreader.hpp"
-#include "libwebm/mkvwriter.hpp"
-#include "libwebm/webmids.hpp"
+#include "libwebm/mkvmuxer/mkvmuxer.h"
+#include "libwebm/mkvmuxer/mkvmuxertypes.h"
+#include "libwebm/mkvmuxer/mkvmuxerutil.h"
+#include "libwebm/mkvmuxer/mkvwriter.h"
+#include "libwebm/mkvparser/mkvparser.h"
+#include "libwebm/mkvparser/mkvreader.h"
+#include "libwebm/common/webmids.h"
 
 #include <stdint.h>
 #include <assert.h>
