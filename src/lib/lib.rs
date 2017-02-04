@@ -199,12 +199,10 @@ pub mod mux {
             AudioTrack(self.ffi, at)
         }
 
-
         /// After calling, all tracks are freed (ie you can't use them).
-        #[allow(unused_mut)]
-        pub fn finalize(mut self) -> bool {
+        pub fn finalize(self, duration: Option<u64>) -> bool {
             let result = unsafe {
-                ffi::mux::finalize_segment(self.ffi)
+                ffi::mux::finalize_segment(self.ffi, duration.unwrap_or(0))
             };
             unsafe {
                 ffi::mux::delete_segment(self.ffi);

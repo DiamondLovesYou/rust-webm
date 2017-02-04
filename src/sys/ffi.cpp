@@ -91,7 +91,10 @@ extern "C" {
   bool mux_initialize_segment(MuxSegmentPtr segment, MkvWriterPtr writer) {
     return segment->Init(writer);
   }
-  bool mux_finalize_segment(MuxSegmentPtr segment) {
+  bool mux_finalize_segment(MuxSegmentPtr segment, uint64_t timeCodeDuration) {
+    if (timeCodeDuration) {
+      segment->set_duration(timeCodeDuration);
+    }
     return segment->Finalize();
   }
   void mux_delete_segment(MuxSegmentPtr segment) {

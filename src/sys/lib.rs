@@ -52,7 +52,7 @@ pub mod mux {
         #[link_name = "mux_initialize_segment"]
         pub fn initialize_segment(segment: SegmentMutPtr, writer: WriterMutPtr) -> bool;
         #[link_name = "mux_finalize_segment"]
-        pub fn finalize_segment(segment: SegmentMutPtr) -> bool;
+        pub fn finalize_segment(segment: SegmentMutPtr, duration: u64) -> bool;
         #[link_name = "mux_delete_segment"]
         pub fn delete_segment(segment: SegmentMutPtr);
 
