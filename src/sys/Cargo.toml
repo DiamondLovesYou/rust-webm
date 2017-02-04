@@ -8,7 +8,7 @@ description = "Rust FFI bindings and wrapper for libwebm"
 license = "MPL-2.0"
 name = "webm-sys-native"
 repository = "https://github.com/pornel/rust-webm.git"
-version = "0.3.0"
+version = "0.3.1"
 include = [
     "lib.rs", "build.rs", "Cargo.toml",
     "ffi.cpp",

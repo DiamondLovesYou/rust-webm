@@ -170,6 +170,18 @@ extern "C" {
 
     return audio;
   }
+
+  int mux_set_color(MuxVideoTrackPtr video, int bits, int sampling_horiz, int sampling_vert, int full_range) {
+    mkvmuxer::Colour color;
+
+    color.set_bits_per_channel(bits);
+    color.set_chroma_subsampling_horz(sampling_horiz);
+    color.set_chroma_subsampling_vert(sampling_vert);
+
+    color.set_range(full_range ? mkvmuxer::Colour::kFullRange : mkvmuxer::Colour::kBroadcastRange);
+    return video->SetColour(color);
+  }
+
   bool mux_segment_add_frame(MuxSegmentPtr segment, MuxTrackPtr track,
                              const uint8_t* frame, const size_t length,
                              const uint64_t timestamp_ns, const bool keyframe) {

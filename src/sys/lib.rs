@@ -3,7 +3,7 @@ extern crate libc;
 
 pub mod mux {
 
-    use libc::{c_void, c_char, size_t};
+    use libc::{c_void, c_char, size_t, c_int};
 
     pub type IWriter = c_void;
     pub type WriterMutPtr = *mut IWriter;
@@ -51,6 +51,7 @@ pub mod mux {
         pub fn new_segment() -> SegmentMutPtr;
         #[link_name = "mux_initialize_segment"]
         pub fn initialize_segment(segment: SegmentMutPtr, writer: WriterMutPtr) -> bool;
+        pub fn mux_set_color(segment: VideoTrackMutPtr, bits: c_int, sampling_horiz: c_int, sampling_vert: c_int, full_range: c_int) -> c_int;
         pub fn mux_set_writing_app(segment: SegmentMutPtr, name: *const c_char);
         #[link_name = "mux_finalize_segment"]
         pub fn finalize_segment(segment: SegmentMutPtr, duration: u64) -> bool;

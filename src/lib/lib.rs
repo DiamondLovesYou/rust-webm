@@ -111,6 +111,15 @@ pub mod mux {
         #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr;
     }
+    impl VideoTrack {
+        pub fn set_color(&mut self, bit_depth: u8, subsampling: (bool, bool), full_range: bool) -> bool {
+            let (sampling_horiz, sampling_vert) = subsampling;
+            fn to_int(b: bool) -> i32 { if b {1} else {0}};
+            unsafe {
+                ffi::mux::mux_set_color(self.get_track(), bit_depth.into(), to_int(sampling_horiz), to_int(sampling_vert), to_int(full_range)) != 0
+            }
+        }
+    }
     impl Track for VideoTrack {
         fn is_video(&self) -> bool { true }
 

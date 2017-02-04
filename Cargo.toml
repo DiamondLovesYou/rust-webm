@@ -9,11 +9,11 @@ license = "MPL-2.0"
 name = "webm-native"
 
 repository = "https://github.com/pornel/rust-webm.git"
-version = "0.4.0"
+version = "0.4.1"
 
 [dependencies]
 libc = "0.2.20"
-webm-sys-native = { version = "0.3.0", path = "src/sys" }
+webm-sys-native = { version = "0.3.1", path = "src/sys" }
 
 [lib]
 name = "webm"
