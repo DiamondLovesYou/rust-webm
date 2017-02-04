@@ -76,7 +76,6 @@ extern "C" {
     writer->element_start_notify_ = element_start_notify;
     writer->user_data = user_data;
 
-    mkvmuxer::WriteEbmlHeader(writer);
 
     return static_cast<MkvWriterPtr>(writer);
   }
