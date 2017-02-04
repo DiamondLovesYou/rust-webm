@@ -9,6 +9,16 @@ license = "MPL-2.0"
 name = "webm-sys-native"
 repository = "https://github.com/pornel/rust-webm.git"
 version = "0.3.0"
+include = [
+    "lib.rs", "build.rs", "Cargo.toml",
+    "ffi.cpp",
+    "libwebm/*.hpp",
+    "libwebm/common/*.h",
+    "libwebm/mkvmuxer/*.cc",
+    "libwebm/mkvmuxer/*.h",
+    "libwebm/mkvparser/*.cc",
+    "libwebm/mkvparser/*.h",
+]
 
 [build-dependencies]
 gcc = "0.3.42"
