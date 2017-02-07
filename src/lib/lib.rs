@@ -1,4 +1,3 @@
-#![feature(box_patterns)]
 
 extern crate webm_sys as ffi;
 extern crate libc;
@@ -68,8 +67,7 @@ pub mod mux {
             unsafe {
                 ffi::mux::delete_writer(self.mkv_writer);
             }
-            let box dest = self.dest;
-            dest
+            *self.dest
         }
     }
 

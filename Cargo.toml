@@ -7,9 +7,8 @@ description = "Rust idiomatic wrapper to libwebm"
 keywords = ["webm"]
 license = "MPL-2.0"
 name = "webm-native"
-
 repository = "https://github.com/pornel/rust-webm.git"
-version = "0.4.1"
+version = "0.4.2"
 
 [dependencies]
 libc = "0.2.20"
