@@ -76,3 +76,7 @@ pub mod mux {
                                  timestamp_ns: u64, keyframe: bool) -> bool;
     }
 }
+
+#[cfg(not(target_os = "nacl"))]
+#[link(name = "stdc++")]
+extern "C" {}
