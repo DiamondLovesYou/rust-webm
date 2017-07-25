@@ -1,14 +1,13 @@
 [package]
 authors = [
-    "Richard Diamond <wichard@vitalitystudios.com>",
     "Kornel Lesiński <kornel@geekhood.net>",
+    "Richard Diamond <wichard@vitalitystudios.com>",
 ]
 build = "build.rs"
 description = "Rust FFI bindings and wrapper for libwebm"
 license = "MPL-2.0"
 name = "webm-sys-native"
 repository = "https://github.com/pornel/rust-webm.git"
-version = "0.3.2"
 include = [
     "lib.rs", "build.rs", "Cargo.toml",
     "ffi.cpp",
@@ -20,6 +19,7 @@ include = [
     "libwebm/mkvparser/*.h",
 ]
 categories = [ "external-ffi-bindings", "multimedia::encoding" ]
+version = "0.3.3"
 
 [build-dependencies]
 gcc = "0.3.42"
