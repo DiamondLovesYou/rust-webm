@@ -12,7 +12,6 @@ version = "0.4.3"
 categories = [ "multimedia::video", "multimedia::encoding", "api-bindings" ]
 
 [dependencies]
-libc = "0.2.20"
 webm-sys-native = { version = "0.3.2", path = "src/sys" }
 
 [lib]

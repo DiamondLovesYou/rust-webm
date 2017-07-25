@@ -1,16 +1,14 @@
 
-extern crate libc;
-
 pub mod mux {
 
-    use libc::{c_void, c_char, size_t, c_int};
+    use std::os::raw::{c_void, c_char, c_int};
 
     pub type IWriter = c_void;
     pub type WriterMutPtr = *mut IWriter;
 
     pub type WriterWriteFn = extern "C" fn(*mut c_void,
                                            *const c_void,
-                                           size_t) -> bool;
+                                           usize) -> bool;
     pub type WriterGetPosFn = extern "C" fn(*mut c_void) -> u64;
     pub type WriterSetPosFn = extern "C" fn(*mut c_void, u64) -> bool;
     pub type WriterElementStartNotifyFn = extern "C" fn(*mut c_void, u64, i64);
@@ -74,7 +72,7 @@ pub mod mux {
         #[link_name = "mux_segment_add_frame"]
         pub fn segment_add_frame(segment: SegmentMutPtr,
                                  track: TrackMutPtr,
-                                 frame: *const u8, length: size_t,
+                                 frame: *const u8, length: usize,
                                  timestamp_ns: u64, keyframe: bool) -> bool;
     }
 }

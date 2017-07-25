@@ -1,10 +1,9 @@
 
 extern crate webm_sys as ffi;
-extern crate libc;
 
 pub mod mux {
     use ffi;
-    use libc::{c_void, size_t};
+    use std::os::raw::c_void;
 
     use std::io::{Write, Seek};
 
@@ -28,7 +27,7 @@ pub mod mux {
 
             extern "C" fn write_fn<T>(dest: *mut c_void,
                                       buf: *const c_void,
-                                      len: size_t) -> bool
+                                      len: usize) -> bool
                 where T: Write + Seek,
             {
                 let dest: &mut T = unsafe { transmute(dest) };
@@ -98,7 +97,7 @@ pub mod mux {
                 ffi::mux::segment_add_frame(self.get_segment(),
                                             self.get_track(),
                                             data.as_ptr(),
-                                            data.len() as size_t,
+                                            data.len() as usize,
                                             timestamp_ns, keyframe)
             }
         }
