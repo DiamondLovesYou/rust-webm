@@ -1,6 +1,5 @@
 
 pub mod mux {
-
     use std::os::raw::{c_void, c_char, c_int};
 
     pub type IWriter = c_void;
@@ -74,5 +73,14 @@ pub mod mux {
                                  track: TrackMutPtr,
                                  frame: *const u8, length: usize,
                                  timestamp_ns: u64, keyframe: bool) -> bool;
+    }
+}
+
+#[test]
+fn smoke_test() {
+    unsafe {
+        let segment = mux::new_segment();
+        assert!(!segment.is_null());
+        mux::delete_segment(segment);
     }
 }
