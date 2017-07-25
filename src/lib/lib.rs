@@ -13,6 +13,9 @@ pub mod mux {
         dest: Box<T>,
         mkv_writer: ffi::mux::WriterMutPtr,
     }
+
+    unsafe impl<T: Send + Write + Seek> Send for Writer<T> {}
+
     impl<T> Writer<T>
         where T: Write + Seek,
     {
@@ -88,6 +91,10 @@ pub mod mux {
     #[derive(Eq, PartialEq, Clone, Copy)]
     pub struct AudioTrack(ffi::mux::SegmentMutPtr,
                           ffi::mux::AudioTrackMutPtr);
+
+    unsafe impl Send for VideoTrack {}
+    unsafe impl Send for AudioTrack {}
+
     pub trait Track {
         fn is_audio(&self) -> bool { false }
         fn is_video(&self) -> bool { false }
@@ -164,6 +171,8 @@ pub mod mux {
             }
         }
     }
+
+    unsafe impl<W: Send> Send for Segment<W> {}
 
     pub struct Segment<W> {
         ffi: ffi::mux::SegmentMutPtr,
