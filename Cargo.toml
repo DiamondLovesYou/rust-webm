@@ -7,12 +7,13 @@ description = "Rust idiomatic wrapper to libwebm"
 keywords = ["webm"]
 license = "MPL-2.0"
 name = "webm-native"
+readme = "README.md"
 repository = "https://github.com/pornel/rust-webm.git"
 categories = [ "multimedia::video", "multimedia::encoding", "api-bindings" ]
-version = "0.4.4"
+version = "0.4.5"
 
 [dependencies]
-webm-sys-native = { version = "0.3.4", path = "src/sys" }
+webm-sys-native = { version = "0.3.5", path = "src/sys" }
 
 [lib]
 name = "webm"
