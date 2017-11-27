@@ -1,11 +1,9 @@
-#![feature(box_patterns)]
 
 extern crate webm_sys as ffi;
-extern crate libc;
 
 pub mod mux {
     use ffi;
-    use libc::{c_void, size_t};
+    use std::os::raw::c_void;
 
     use std::io::{Write, Seek};
 
@@ -15,6 +13,9 @@ pub mod mux {
         dest: Box<T>,
         mkv_writer: ffi::mux::WriterMutPtr,
     }
+
+    unsafe impl<T: Send + Write + Seek> Send for Writer<T> {}
+
     impl<T> Writer<T>
         where T: Write + Seek,
     {
@@ -29,7 +30,7 @@ pub mod mux {
 
             extern "C" fn write_fn<T>(dest: *mut c_void,
                                       buf: *const c_void,
-                                      len: size_t) -> bool
+                                      len: usize) -> bool
                 where T: Write + Seek,
             {
                 let dest: &mut T = unsafe { transmute(dest) };
@@ -68,8 +69,7 @@ pub mod mux {
             unsafe {
                 ffi::mux::delete_writer(self.mkv_writer);
             }
-            let box dest = self.dest;
-            dest
+            *self.dest
         }
     }
 
@@ -91,6 +91,10 @@ pub mod mux {
     #[derive(Eq, PartialEq, Clone, Copy)]
     pub struct AudioTrack(ffi::mux::SegmentMutPtr,
                           ffi::mux::AudioTrackMutPtr);
+
+    unsafe impl Send for VideoTrack {}
+    unsafe impl Send for AudioTrack {}
+
     pub trait Track {
         fn is_audio(&self) -> bool { false }
         fn is_video(&self) -> bool { false }
@@ -100,7 +104,7 @@ pub mod mux {
                 ffi::mux::segment_add_frame(self.get_segment(),
                                             self.get_track(),
                                             data.as_ptr(),
-                                            data.len() as size_t,
+                                            data.len() as usize,
                                             timestamp_ns, keyframe)
             }
         }
@@ -110,6 +114,15 @@ pub mod mux {
 
         #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr;
+    }
+    impl VideoTrack {
+        pub fn set_color(&mut self, bit_depth: u8, subsampling: (bool, bool), full_range: bool) -> bool {
+            let (sampling_horiz, sampling_vert) = subsampling;
+            fn to_int(b: bool) -> i32 { if b {1} else {0}};
+            unsafe {
+                ffi::mux::mux_set_color(self.get_track(), bit_depth.into(), to_int(sampling_horiz), to_int(sampling_vert), to_int(full_range)) != 0
+            }
+        }
     }
     impl Track for VideoTrack {
         fn is_video(&self) -> bool { true }
@@ -159,14 +172,17 @@ pub mod mux {
         }
     }
 
-    pub struct Segment {
+    unsafe impl<W: Send> Send for Segment<W> {}
+
+    pub struct Segment<W> {
         ffi: ffi::mux::SegmentMutPtr,
+        _writer: W,
     }
 
-    impl Segment {
+    impl<W> Segment<W> {
         /// Note: the supplied writer must have a lifetime larger than the segment.
-        pub fn new<T>(dest: &T) -> Option<Segment>
-            where T: MkvWriter,
+        pub fn new(dest: W) -> Option<Self>
+            where W: MkvWriter,
         {
             let ffi = unsafe { ffi::mux::new_segment() };
             let success = unsafe {
@@ -176,7 +192,15 @@ pub mod mux {
 
             Some(Segment {
                 ffi: ffi,
+                _writer: dest,
             })
+        }
+
+        pub fn set_app_name(&mut self, name: &str) {
+            use std::ffi::CString;
+            unsafe {
+                ffi::mux::mux_set_writing_app(self.ffi, CString::new(name).unwrap().as_ptr());
+            }
         }
 
         pub fn add_video_track(&mut self, width: u32, height: u32,
@@ -197,12 +221,10 @@ pub mod mux {
             AudioTrack(self.ffi, at)
         }
 
-
         /// After calling, all tracks are freed (ie you can't use them).
-        #[allow(unused_mut)]
-        pub fn finalize(mut self) -> bool {
+        pub fn finalize(self, duration: Option<u64>) -> bool {
             let result = unsafe {
-                ffi::mux::finalize_segment(self.ffi)
+                ffi::mux::finalize_segment(self.ffi, duration.unwrap_or(0))
             };
             unsafe {
                 ffi::mux::delete_segment(self.ffi);

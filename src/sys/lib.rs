@@ -1,16 +1,13 @@
 
-extern crate libc;
-
 pub mod mux {
-
-    use libc::{c_void, size_t};
+    use std::os::raw::{c_void, c_char, c_int};
 
     pub type IWriter = c_void;
     pub type WriterMutPtr = *mut IWriter;
 
     pub type WriterWriteFn = extern "C" fn(*mut c_void,
                                            *const c_void,
-                                           size_t) -> bool;
+                                           usize) -> bool;
     pub type WriterGetPosFn = extern "C" fn(*mut c_void) -> u64;
     pub type WriterSetPosFn = extern "C" fn(*mut c_void, u64) -> bool;
     pub type WriterElementStartNotifyFn = extern "C" fn(*mut c_void, u64, i64);
@@ -36,7 +33,7 @@ pub mod mux {
     pub type AudioTrackMutPtr = *mut AudioTrack;
 
 
-    #[link(name = "webm", kind = "static")]
+    #[link(name = "webmadapter", kind = "static")]
     extern "C" {
         #[link_name = "mux_new_writer"]
         pub fn new_writer(write: Option<WriterWriteFn>,
@@ -51,8 +48,10 @@ pub mod mux {
         pub fn new_segment() -> SegmentMutPtr;
         #[link_name = "mux_initialize_segment"]
         pub fn initialize_segment(segment: SegmentMutPtr, writer: WriterMutPtr) -> bool;
+        pub fn mux_set_color(segment: VideoTrackMutPtr, bits: c_int, sampling_horiz: c_int, sampling_vert: c_int, full_range: c_int) -> c_int;
+        pub fn mux_set_writing_app(segment: SegmentMutPtr, name: *const c_char);
         #[link_name = "mux_finalize_segment"]
-        pub fn finalize_segment(segment: SegmentMutPtr) -> bool;
+        pub fn finalize_segment(segment: SegmentMutPtr, duration: u64) -> bool;
         #[link_name = "mux_delete_segment"]
         pub fn delete_segment(segment: SegmentMutPtr);
 
@@ -72,11 +71,16 @@ pub mod mux {
         #[link_name = "mux_segment_add_frame"]
         pub fn segment_add_frame(segment: SegmentMutPtr,
                                  track: TrackMutPtr,
-                                 frame: *const u8, length: size_t,
+                                 frame: *const u8, length: usize,
                                  timestamp_ns: u64, keyframe: bool) -> bool;
     }
 }
 
-#[cfg(not(target_os = "nacl"))]
-#[link(name = "stdc++")]
-extern "C" {}
+#[test]
+fn smoke_test() {
+    unsafe {
+        let segment = mux::new_segment();
+        assert!(!segment.is_null());
+        mux::delete_segment(segment);
+    }
+}

@@ -1,11 +1,11 @@
 
-#include "libwebm/mkvmuxer.hpp"
-#include "libwebm/mkvmuxertypes.hpp"
-#include "libwebm/mkvmuxerutil.hpp"
-#include "libwebm/mkvparser.hpp"
-#include "libwebm/mkvreader.hpp"
-#include "libwebm/mkvwriter.hpp"
-#include "libwebm/webmids.hpp"
+#include "libwebm/mkvmuxer/mkvmuxer.h"
+#include "libwebm/mkvmuxer/mkvmuxertypes.h"
+#include "libwebm/mkvmuxer/mkvmuxerutil.h"
+#include "libwebm/mkvmuxer/mkvwriter.h"
+#include "libwebm/mkvparser/mkvparser.h"
+#include "libwebm/mkvparser/mkvreader.h"
+#include "libwebm/common/webmids.h"
 
 #include <stdint.h>
 #include <assert.h>
@@ -76,7 +76,6 @@ extern "C" {
     writer->element_start_notify_ = element_start_notify;
     writer->user_data = user_data;
 
-    mkvmuxer::WriteEbmlHeader(writer);
 
     return static_cast<MkvWriterPtr>(writer);
   }
@@ -92,7 +91,14 @@ extern "C" {
   bool mux_initialize_segment(MuxSegmentPtr segment, MkvWriterPtr writer) {
     return segment->Init(writer);
   }
-  bool mux_finalize_segment(MuxSegmentPtr segment) {
+  void mux_set_writing_app(MuxSegmentPtr segment, const char *name) {
+    auto info = segment->GetSegmentInfo();
+    info->set_writing_app(name);
+  }
+  bool mux_finalize_segment(MuxSegmentPtr segment, uint64_t timeCodeDuration) {
+    if (timeCodeDuration) {
+      segment->set_duration(timeCodeDuration);
+    }
     return segment->Finalize();
   }
   void mux_delete_segment(MuxSegmentPtr segment) {
@@ -164,6 +170,18 @@ extern "C" {
 
     return audio;
   }
+
+  int mux_set_color(MuxVideoTrackPtr video, int bits, int sampling_horiz, int sampling_vert, int full_range) {
+    mkvmuxer::Colour color;
+
+    color.set_bits_per_channel(bits);
+    color.set_chroma_subsampling_horz(sampling_horiz);
+    color.set_chroma_subsampling_vert(sampling_vert);
+
+    color.set_range(full_range ? mkvmuxer::Colour::kFullRange : mkvmuxer::Colour::kBroadcastRange);
+    return video->SetColour(color);
+  }
+
   bool mux_segment_add_frame(MuxSegmentPtr segment, MuxTrackPtr track,
                              const uint8_t* frame, const size_t length,
                              const uint64_t timestamp_ns, const bool keyframe) {

@@ -1,21 +1,22 @@
+extern crate gcc;
 
-extern crate pnacl_build_helper as helper;
-
-pub fn main() {
-    helper::set_pkg_config_envs();
-    helper::print_lib_paths();
-
-    let mut a = helper::Archive::new("webm");
-    let args = &["-Os".to_string(),
-                 "-fno-rtti".to_string(),
-                 "-fno-exceptions".to_string(),
-                 "-std=gnu++11".to_string(),
-                 ];
-    a.cxx("libwebm/mkvmuxer.cpp", args);
-    a.cxx("libwebm/mkvmuxerutil.cpp", args);
-    a.cxx("libwebm/mkvparser.cpp", args);
-    a.cxx("libwebm/mkvreader.cpp", args);
-    a.cxx("libwebm/mkvwriter.cpp", args);
-    a.cxx("ffi.cpp", args);
-    a.archive();
+fn main() {
+    let files = &[
+        "libwebm/mkvmuxer/mkvmuxer.cc",
+        "libwebm/mkvmuxer/mkvwriter.cc",
+        "libwebm/mkvmuxer/mkvmuxerutil.cc",
+        "libwebm/mkvparser/mkvparser.cc",
+        "libwebm/mkvparser/mkvreader.cc",
+        "ffi.cpp",
+    ];
+    let mut c = gcc::Config::new();
+    c.cpp(true);
+    c.flag("-fno-rtti");
+    c.flag("-std=gnu++11");
+    c.flag("-fno-exceptions");
+    c.flag("-Ilibwebm");
+    for f in files.iter() {
+        c.file(*f);
+    }
+    c.compile("libwebmadapter.a");
 }
