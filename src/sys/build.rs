@@ -1,4 +1,4 @@
-extern crate gcc;
+extern crate cc;
 
 fn main() {
     let files = &[
@@ -9,14 +9,15 @@ fn main() {
         "libwebm/mkvparser/mkvreader.cc",
         "ffi.cpp",
     ];
-    let mut c = gcc::Config::new();
+    let mut c = cc::Build::new();
     c.cpp(true);
+    c.warnings(false);
     c.flag("-fno-rtti");
     c.flag("-std=gnu++11");
     c.flag("-fno-exceptions");
-    c.flag("-Ilibwebm");
-    for f in files.iter() {
-        c.file(*f);
+    c.include("libwebm");
+    for &f in files.iter() {
+        c.file(f);
     }
     c.compile("libwebmadapter.a");
 }
