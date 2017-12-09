@@ -4,7 +4,7 @@ authors = [
     "Richard Diamond <wichard@vitalitystudios.com>",
 ]
 description = "Rust idiomatic wrapper to libwebm"
-keywords = ["webm"]
+keywords = ["webm", "video"]
 license = "MPL-2.0"
 name = "webm"
 readme = "README.md"

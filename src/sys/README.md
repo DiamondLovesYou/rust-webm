@@ -1,3 +1,3 @@
-Rust FFI bindings for libwebm
+# Rust FFI bindings for libwebm
 
-See [webm-native](https://crates.io/crates/webm-native) for Rust wapper.
+See [webm crate](https://crates.io/crates/webm) for a higher-level Rust wrapper.
