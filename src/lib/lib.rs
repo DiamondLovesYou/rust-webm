@@ -221,8 +221,7 @@ pub mod mux {
             AudioTrack(self.ffi, at)
         }
 
-        /// After calling, all tracks are freed (ie you can't use them).
-        pub fn finalize(self, duration: Option<u64>) -> Option<W> {
+        pub fn try_finalize(self, duration: Option<u64>) -> Result<W, W> {
             let result = unsafe {
                 ffi::mux::finalize_segment(self.ffi, duration.unwrap_or(0))
             };
@@ -230,10 +229,15 @@ pub mod mux {
                 ffi::mux::delete_segment(self.ffi);
             }
             if result {
-                Some(self._writer)
+                Ok(self._writer)
             } else {
-                None
+                Err(self._writer)
             }
+        }
+
+        /// After calling, all tracks are freed (ie you can't use them).
+        pub fn finalize(self, duration: Option<u64>) -> bool {
+            self.try_finalize(duration).is_ok()
         }
     }
 }
