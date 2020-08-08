@@ -222,14 +222,18 @@ pub mod mux {
         }
 
         /// After calling, all tracks are freed (ie you can't use them).
-        pub fn finalize(self, duration: Option<u64>) -> bool {
+        pub fn finalize(self, duration: Option<u64>) -> Option<W> {
             let result = unsafe {
                 ffi::mux::finalize_segment(self.ffi, duration.unwrap_or(0))
             };
             unsafe {
                 ffi::mux::delete_segment(self.ffi);
             }
-            result
+            if result {
+                Some(self._writer)
+            } else {
+                None
+            }
         }
     }
 }
