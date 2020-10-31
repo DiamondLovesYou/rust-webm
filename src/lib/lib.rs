@@ -2,7 +2,7 @@
 extern crate webm_sys as ffi;
 
 pub mod mux {
-    use ffi;
+    use crate::ffi;
     use std::os::raw::c_void;
 
     use std::io::{Write, Seek};
