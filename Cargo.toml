@@ -20,3 +20,5 @@ webm-sys = { version = "1.0.0", path = "src/sys" }
 name = "webm"
 path = "src/lib/lib.rs"
 
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]

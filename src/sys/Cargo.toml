@@ -23,10 +23,10 @@ include = [
 ]
 keywords = ["webm", "mkv", "matroska", "vp9"]
 categories = [ "external-ffi-bindings", "multimedia::encoding" ]
-version = "1.0.0"
+version = "1.0.1"
 
 [build-dependencies]
-cc = "1.0.3"
+cc = "1.0.61"
 
 [lib]
 name = "webm_sys"
