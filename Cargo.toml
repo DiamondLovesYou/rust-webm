@@ -1,4 +1,5 @@
 [package]
+version = "1.0.2"
 authors = [
     "Kornel Lesiński <kornel@geekhood.net>",
     "Richard Diamond <wichard@vitalitystudios.com>",
@@ -7,11 +8,11 @@ description = "Rust idiomatic wrapper to libwebm"
 keywords = ["webm", "video"]
 license = "MPL-2.0"
 name = "webm"
-homepage = "https://crates.rs/crates/webm"
+homepage = "https://lib.rs/crates/webm"
 readme = "README.md"
 repository = "https://github.com/DiamondLovesYou/rust-webm.git"
 categories = [ "multimedia::video", "multimedia::encoding", "api-bindings" ]
-version = "1.0.1"
+edition = "2018"
 
 [dependencies]
 webm-sys = { version = "1.0.0", path = "src/sys" }
