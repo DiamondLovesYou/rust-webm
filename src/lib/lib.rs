@@ -22,7 +22,6 @@ pub mod mux {
         pub fn new(dest: T) -> Writer<T> {
             use std::io::SeekFrom;
             use std::slice::from_raw_parts;
-            use std::mem::transmute;
             let mut w = Writer {
                 dest: Box::new(dest),
                 mkv_writer: 0 as ffi::mux::WriterMutPtr,
@@ -33,8 +32,7 @@ pub mod mux {
                                       len: usize) -> bool
                 where T: Write + Seek,
             {
-                let dest: &mut T = unsafe { transmute(dest) };
-
+                let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
                 let buf = unsafe {
                     from_raw_parts(buf as *const u8, len as usize)
                 };
@@ -43,7 +41,7 @@ pub mod mux {
             extern "C" fn get_pos_fn<T>(dest: *mut c_void) -> u64
                 where T: Write + Seek,
             {
-                let dest: &mut T = unsafe { transmute(dest) };
+                let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
                 dest.seek(SeekFrom::Current(0))
                     .unwrap()
             }
@@ -51,7 +49,7 @@ pub mod mux {
                                         pos: u64) -> bool
                 where T: Write + Seek,
             {
-                let dest: &mut T = unsafe { transmute(dest) };
+                let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
                 dest.seek(SeekFrom::Start(pos)).is_ok()
             }
 
@@ -60,9 +58,9 @@ pub mod mux {
                                      Some(get_pos_fn::<T>),
                                      Some(set_pos_fn::<T>),
                                      None,
-                                     transmute(&mut *w.dest))
+                                     (&mut *w.dest) as *mut T as *mut _)
             };
-            debug_assert!(w.mkv_writer != 0 as *mut _);
+            assert!(!w.mkv_writer.is_null());
             w
         }
         pub fn unwrap(self) -> T {
@@ -118,7 +116,7 @@ pub mod mux {
     impl VideoTrack {
         pub fn set_color(&mut self, bit_depth: u8, subsampling: (bool, bool), full_range: bool) -> bool {
             let (sampling_horiz, sampling_vert) = subsampling;
-            fn to_int(b: bool) -> i32 { if b {1} else {0}};
+            fn to_int(b: bool) -> i32 { if b {1} else {0} }
             unsafe {
                 ffi::mux::mux_set_color(self.get_track(), bit_depth.into(), to_int(sampling_horiz), to_int(sampling_vert), to_int(full_range)) != 0
             }
@@ -153,8 +151,8 @@ pub mod mux {
     impl AudioCodecId {
         fn get_id(&self) -> u32 {
             match self {
-                &AudioCodecId::Opus => ffi::mux::OPUS_CODEC_ID,
-                &AudioCodecId::Vorbis => ffi::mux::VORBIS_CODEC_ID,
+                AudioCodecId::Opus => ffi::mux::OPUS_CODEC_ID,
+                AudioCodecId::Vorbis => ffi::mux::VORBIS_CODEC_ID,
             }
         }
     }
@@ -166,8 +164,8 @@ pub mod mux {
     impl VideoCodecId {
         fn get_id(&self) -> u32 {
             match self {
-                &VideoCodecId::VP8 => ffi::mux::VP8_CODEC_ID,
-                &VideoCodecId::VP9 => ffi::mux::VP9_CODEC_ID,
+                VideoCodecId::VP8 => ffi::mux::VP8_CODEC_ID,
+                VideoCodecId::VP9 => ffi::mux::VP9_CODEC_ID,
             }
         }
     }
@@ -191,15 +189,15 @@ pub mod mux {
             if !success { return None; }
 
             Some(Segment {
-                ffi: ffi,
+                ffi,
                 _writer: dest,
             })
         }
 
         pub fn set_app_name(&mut self, name: &str) {
-            use std::ffi::CString;
+            let name = std::ffi::CString::new(name).unwrap();
             unsafe {
-                ffi::mux::mux_set_writing_app(self.ffi, CString::new(name).unwrap().as_ptr());
+                ffi::mux::mux_set_writing_app(self.ffi, name.as_ptr());
             }
         }
 
