@@ -1,4 +1,3 @@
-extern crate cc;
 
 fn main() {
     let files = &[

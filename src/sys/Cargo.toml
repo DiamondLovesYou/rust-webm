@@ -9,6 +9,7 @@ documentation = "https://docs.rs/webm"
 homepage = "https://crates.rs/crates/webm-sys"
 license = "MPL-2.0"
 name = "webm-sys"
+links = "webm"
 readme = "README.md"
 repository = "https://github.com/DiamondLovesYou/rust-webm.git"
 include = [
@@ -23,12 +24,15 @@ include = [
 ]
 keywords = ["webm", "mkv", "matroska", "vp9"]
 categories = [ "external-ffi-bindings", "multimedia::encoding" ]
-version = "1.0.2"
-edition = "2018"
+version = "1.0.3"
+edition = "2021"
 
 [build-dependencies]
-cc = "1.0.67"
+cc = "1.0.72"
 
 [lib]
 name = "webm_sys"
 path = "lib.rs"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
