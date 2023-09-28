@@ -6,7 +6,7 @@ authors = [
 build = "build.rs"
 description = "Rust FFI bindings and wrapper for libwebm"
 documentation = "https://docs.rs/webm"
-homepage = "https://crates.rs/crates/webm-sys"
+homepage = "https://lib.rs/crates/webm-sys"
 license = "MPL-2.0"
 name = "webm-sys"
 links = "webm"
@@ -23,8 +23,8 @@ include = [
     "libwebm/mkvparser/*.h",
 ]
 keywords = ["webm", "mkv", "matroska", "vp9"]
-categories = [ "external-ffi-bindings", "multimedia::encoding" ]
-version = "1.0.3"
+categories = [ "external-ffi-bindings", "multimedia::encoding", "multimedia::video"]
+version = "1.0.4"
 edition = "2021"
 
 [build-dependencies]
