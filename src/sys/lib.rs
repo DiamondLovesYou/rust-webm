@@ -19,6 +19,7 @@ pub mod mux {
     // video
     pub const VP8_CODEC_ID: u32 = 0;
     pub const VP9_CODEC_ID: u32 = 1;
+    pub const AV1_CODEC_ID: u32 = 2;
 
     pub type Segment = c_void;
     pub type SegmentMutPtr = *mut Segment;
@@ -63,7 +64,7 @@ pub mod mux {
         #[link_name = "mux_segment_add_video_track"]
         pub fn segment_add_video_track(segment: SegmentMutPtr,
                                        width: i32, height: i32,
-                                       number: i32, codec_id: u32) -> VideoTrackMutPtr;
+                                       number: i32, codec_id: u32, id_out: *const u64) -> VideoTrackMutPtr;
         #[link_name = "mux_segment_add_audio_track"]
         pub fn segment_add_audio_track(segment: SegmentMutPtr,
                                        sample_rate: i32, channels: i32,
@@ -73,6 +74,9 @@ pub mod mux {
                                  track: TrackMutPtr,
                                  frame: *const u8, length: usize,
                                  timestamp_ns: u64, keyframe: bool) -> bool;
+        #[link_name = "mux_segment_set_codec_private"]
+        pub fn segment_set_codec_private(segment: SegmentMutPtr,
+                                         number: u64, data: *const u8, len: i32) -> bool;
     }
 }
 

@@ -1,5 +1,5 @@
-
 fn main() {
+    println!("cargo:rerun-if-changed=ffi.cpp");
     let files = &[
         "libwebm/mkvmuxer/mkvmuxer.cc",
         "libwebm/mkvmuxer/mkvwriter.cc",
