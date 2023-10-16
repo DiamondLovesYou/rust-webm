@@ -129,16 +129,31 @@ extern "C" {
   // video
   const uint32_t VP8_CODEC_ID = 0;
   const uint32_t VP9_CODEC_ID = 1;
+  const uint32_t AV1_CODEC_ID = 2;
+
+  bool mux_segment_set_codec_private(MuxSegmentPtr segment, uint64_t number, const uint8_t *data, int len) {
+    mkvmuxer::VideoTrack *const video_track = static_cast<mkvmuxer::VideoTrack *>(segment->GetTrackByNumber(number));
+    if (!video_track) {
+      fprintf(stderr, "Video track creation failed.\n");
+      return false;
+    }
+    if (!video_track->SetCodecPrivate(data, len)) {
+      fprintf(stderr, "Video track SetCodecPrivate failed.\n");
+      return false;
+    }
+    return true;
+  }
 
   MuxVideoTrackPtr mux_segment_add_video_track(MuxSegmentPtr segment, const int32_t width,
                                                const int32_t height, const int32_t number,
-                                               const uint32_t codec_id) {
+                                               const uint32_t codec_id, uint64_t* id_out) {
     if(segment == nullptr) { return nullptr; }
 
     const char* codec_id_str = nullptr;
     switch(codec_id) {
     case VP8_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kVp8CodecId; break;
     case VP9_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kVp9CodecId; break;
+    case AV1_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kAv1CodecId; break;
     default: return nullptr;
     }
 
@@ -148,6 +163,7 @@ extern "C" {
     auto video = static_cast<MuxVideoTrackPtr>(segment->GetTrackByNumber(id));
     video->set_codec_id(codec_id_str);
 
+    *id_out = id;
     return video;
   }
   MuxAudioTrackPtr mux_segment_add_audio_track(MuxSegmentPtr segment, const int32_t sample_rate,
@@ -190,4 +206,5 @@ extern "C" {
     return segment->AddFrame(frame, length, track->number(),
                              timestamp_ns, keyframe);
   }
+
 }

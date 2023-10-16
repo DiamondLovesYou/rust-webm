@@ -85,7 +85,8 @@ pub mod mux {
 
     #[derive(Eq, PartialEq, Clone, Copy)]
     pub struct VideoTrack(ffi::mux::SegmentMutPtr,
-                          ffi::mux::VideoTrackMutPtr);
+                          ffi::mux::VideoTrackMutPtr,
+                          u64);
     #[derive(Eq, PartialEq, Clone, Copy)]
     pub struct AudioTrack(ffi::mux::SegmentMutPtr,
                           ffi::mux::AudioTrackMutPtr);
@@ -120,6 +121,10 @@ pub mod mux {
             unsafe {
                 ffi::mux::mux_set_color(self.get_track(), bit_depth.into(), to_int(sampling_horiz), to_int(sampling_vert), to_int(full_range)) != 0
             }
+        }
+
+        pub fn track_number(&self) -> u64 {
+            self.2
         }
     }
     impl Track for VideoTrack {
@@ -160,12 +165,14 @@ pub mod mux {
     pub enum VideoCodecId {
         VP8,
         VP9,
+        AV1,
     }
     impl VideoCodecId {
         fn get_id(&self) -> u32 {
             match self {
                 VideoCodecId::VP8 => ffi::mux::VP8_CODEC_ID,
                 VideoCodecId::VP9 => ffi::mux::VP9_CODEC_ID,
+                VideoCodecId::AV1 => ffi::mux::AV1_CODEC_ID,
             }
         }
     }
@@ -204,12 +211,21 @@ pub mod mux {
         pub fn add_video_track(&mut self, width: u32, height: u32,
                                id: Option<i32>, codec: VideoCodecId) -> VideoTrack
         {
+            let mut id_out: u64 = 0;
             let vt = unsafe {
                 ffi::mux::segment_add_video_track(self.ffi, width as i32, height as i32,
-                                                  id.unwrap_or(0), codec.get_id())
+                                                 id.unwrap_or(0), codec.get_id(),
+                                                (&mut id_out) as *const u64)
             };
-            VideoTrack(self.ffi, vt)
+            VideoTrack(self.ffi, vt, id_out)
         }
+
+        pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> bool {
+            unsafe {
+                ffi::mux::segment_set_codec_private(self.ffi, track_number, data.as_ptr(), data.len() as _,)
+            }
+        }
+
         pub fn add_audio_track(&mut self, sample_rate: i32, channels: i32,
                                id: Option<i32>, codec: AudioCodecId) -> AudioTrack {
             let at = unsafe {
