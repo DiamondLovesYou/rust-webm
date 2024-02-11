@@ -27,27 +27,27 @@ pub mod mux {
                 mkv_writer: 0 as ffi::mux::WriterMutPtr,
             };
 
-            extern "C" fn write_fn<T>(dest: *mut c_void,
-                                      buf: *const c_void,
-                                      len: usize) -> bool
-                where T: Write + Seek,
+            extern "C" fn write_fn<T>(dest: *mut c_void, buf: *const c_void, len: usize) -> bool
+            where
+                T: Write + Seek,
             {
+                if buf.is_null() {
+                    return false;
+                }
                 let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
-                let buf = unsafe {
-                    from_raw_parts(buf as *const u8, len as usize)
-                };
+                let buf = unsafe { from_raw_parts(buf.cast::<u8>(), len) };
                 dest.write(buf).is_ok()
             }
             extern "C" fn get_pos_fn<T>(dest: *mut c_void) -> u64
-                where T: Write + Seek,
+            where
+                T: Write + Seek,
             {
                 let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
-                dest.seek(SeekFrom::Current(0))
-                    .unwrap()
+                dest.stream_position().unwrap()
             }
-            extern "C" fn set_pos_fn<T>(dest: *mut c_void,
-                                        pos: u64) -> bool
-                where T: Write + Seek,
+            extern "C" fn set_pos_fn<T>(dest: *mut c_void, pos: u64) -> bool
+            where
+                T: Write + Seek,
             {
                 let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
                 dest.seek(SeekFrom::Start(pos)).is_ok()
@@ -58,11 +58,13 @@ pub mod mux {
                                      Some(get_pos_fn::<T>),
                                      Some(set_pos_fn::<T>),
                                      None,
-                                     (&mut *w.dest) as *mut T as *mut _)
+                                     std::ptr::addr_of_mut!(*w.dest).cast())
             };
             assert!(!w.mkv_writer.is_null());
             w
         }
+
+        #[must_use]
         pub fn unwrap(self) -> T {
             unsafe {
                 ffi::mux::delete_writer(self.mkv_writer);
@@ -75,6 +77,7 @@ pub mod mux {
     pub trait MkvWriter {
         fn mkv_writer(&self) -> ffi::mux::WriterMutPtr;
     }
+
     impl<T> MkvWriter for Writer<T>
         where T: Write + Seek,
     {
@@ -103,7 +106,7 @@ pub mod mux {
                 ffi::mux::segment_add_frame(self.get_segment(),
                                             self.get_track(),
                                             data.as_ptr(),
-                                            data.len() as usize,
+                                            data.len(),
                                             timestamp_ns, keyframe)
             }
         }
@@ -123,6 +126,7 @@ pub mod mux {
             }
         }
 
+        #[must_use]
         pub fn track_number(&self) -> u64 {
             self.2
         }
@@ -181,7 +185,7 @@ pub mod mux {
 
     pub struct Segment<W> {
         ffi: ffi::mux::SegmentMutPtr,
-        _writer: W,
+        writer: W,
     }
 
     impl<W> Segment<W> {
@@ -197,7 +201,7 @@ pub mod mux {
 
             Some(Segment {
                 ffi,
-                _writer: dest,
+                writer: dest,
             })
         }
 
@@ -214,15 +218,14 @@ pub mod mux {
             let mut id_out: u64 = 0;
             let vt = unsafe {
                 ffi::mux::segment_add_video_track(self.ffi, width as i32, height as i32,
-                                                 id.unwrap_or(0), codec.get_id(),
-                                                (&mut id_out) as *const u64)
+                                                 id.unwrap_or(0), codec.get_id(), &mut id_out)
             };
             VideoTrack(self.ffi, vt, id_out)
         }
 
         pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> bool {
             unsafe {
-                ffi::mux::segment_set_codec_private(self.ffi, track_number, data.as_ptr(), data.len() as _,)
+                ffi::mux::segment_set_codec_private(self.ffi, track_number, data.as_ptr(), data.len().try_into().unwrap())
             }
         }
 
@@ -243,9 +246,9 @@ pub mod mux {
                 ffi::mux::delete_segment(self.ffi);
             }
             if result {
-                Ok(self._writer)
+                Ok(self.writer)
             } else {
-                Err(self._writer)
+                Err(self.writer)
             }
         }
 
