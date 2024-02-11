@@ -15,7 +15,7 @@ categories = [ "multimedia::video", "multimedia::encoding", "api-bindings" ]
 edition = "2021"
 
 [dependencies]
-webm-sys = { version = "1.0.4", path = "src/sys" }
+webm-sys = { version = "1.0.5", path = "src/sys" }
 
 [lib]
 name = "webm"
