@@ -1,4 +1,3 @@
-
 extern crate webm_sys as ffi;
 
 pub mod mux {
@@ -6,12 +5,14 @@ pub mod mux {
     use std::os::raw::c_void;
 
     use std::io::{Write, Seek};
+    use std::pin::Pin;
+    use std::ptr::NonNull;
 
     pub struct Writer<T>
         where T: Write + Seek,
     {
-        dest: Box<T>,
-        mkv_writer: ffi::mux::WriterMutPtr,
+        dest: Pin<Box<T>>,
+        mkv_writer: ffi::mux::WriterNonNullPtr,
     }
 
     unsafe impl<T: Send + Write + Seek> Send for Writer<T> {}
@@ -22,14 +23,10 @@ pub mod mux {
         pub fn new(dest: T) -> Writer<T> {
             use std::io::SeekFrom;
             use std::slice::from_raw_parts;
-            let mut w = Writer {
-                dest: Box::new(dest),
-                mkv_writer: 0 as ffi::mux::WriterMutPtr,
-            };
 
             extern "C" fn write_fn<T>(dest: *mut c_void, buf: *const c_void, len: usize) -> bool
-            where
-                T: Write + Seek,
+                where
+                    T: Write + Seek,
             {
                 if buf.is_null() {
                     return false;
@@ -39,37 +36,43 @@ pub mod mux {
                 dest.write(buf).is_ok()
             }
             extern "C" fn get_pos_fn<T>(dest: *mut c_void) -> u64
-            where
-                T: Write + Seek,
+                where
+                    T: Write + Seek,
             {
                 let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
                 dest.stream_position().unwrap()
             }
             extern "C" fn set_pos_fn<T>(dest: *mut c_void, pos: u64) -> bool
-            where
-                T: Write + Seek,
+                where
+                    T: Write + Seek,
             {
                 let dest = unsafe { dest.cast::<T>().as_mut().unwrap() };
                 dest.seek(SeekFrom::Start(pos)).is_ok()
             }
 
-            w.mkv_writer = unsafe {
+            let mut dest = Box::pin(dest);
+            let mkv_writer = unsafe {
                 ffi::mux::new_writer(Some(write_fn::<T>),
                                      Some(get_pos_fn::<T>),
                                      Some(set_pos_fn::<T>),
                                      None,
-                                     std::ptr::addr_of_mut!(*w.dest).cast())
+                                     (dest.as_mut().get_unchecked_mut() as *mut T).cast())
             };
-            assert!(!w.mkv_writer.is_null());
+            assert!(!mkv_writer.is_null());
+
+            let w = Writer {
+                dest,
+                mkv_writer: NonNull::new(mkv_writer).unwrap(),
+            };
             w
         }
 
         #[must_use]
         pub fn unwrap(self) -> T {
             unsafe {
-                ffi::mux::delete_writer(self.mkv_writer);
+                ffi::mux::delete_writer(self.mkv_writer.as_ptr());
+                *Pin::into_inner_unchecked(self.dest)
             }
-            *self.dest
         }
     }
 
@@ -82,19 +85,21 @@ pub mod mux {
         where T: Write + Seek,
     {
         fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
-            self.mkv_writer
+            self.mkv_writer.as_ptr()
         }
     }
 
     #[derive(Eq, PartialEq, Clone, Copy)]
-    pub struct VideoTrack(ffi::mux::SegmentMutPtr,
-                          ffi::mux::VideoTrackMutPtr,
+    pub struct VideoTrack(ffi::mux::SegmentNonNullPtr,
+                          ffi::mux::VideoTrackNonNullPtr,
                           u64);
+
     #[derive(Eq, PartialEq, Clone, Copy)]
-    pub struct AudioTrack(ffi::mux::SegmentMutPtr,
-                          ffi::mux::AudioTrackMutPtr);
+    pub struct AudioTrack(ffi::mux::SegmentNonNullPtr,
+                          ffi::mux::AudioTrackNonNullPtr);
 
     unsafe impl Send for VideoTrack {}
+
     unsafe impl Send for AudioTrack {}
 
     pub trait Track {
@@ -117,10 +122,11 @@ pub mod mux {
         #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr;
     }
+
     impl VideoTrack {
         pub fn set_color(&mut self, bit_depth: u8, subsampling: (bool, bool), full_range: bool) -> bool {
             let (sampling_horiz, sampling_vert) = subsampling;
-            fn to_int(b: bool) -> i32 { if b {1} else {0} }
+            fn to_int(b: bool) -> i32 { if b { 1 } else { 0 } }
             unsafe {
                 ffi::mux::mux_set_color(self.get_track(), bit_depth.into(), to_int(sampling_horiz), to_int(sampling_vert), to_int(full_range)) != 0
             }
@@ -131,24 +137,26 @@ pub mod mux {
             self.2
         }
     }
+
     impl Track for VideoTrack {
         fn is_video(&self) -> bool { true }
 
         #[doc(hidden)]
-        fn get_segment(&self) -> ffi::mux::SegmentMutPtr { self.0 }
+        fn get_segment(&self) -> ffi::mux::SegmentMutPtr { self.0.as_ptr() }
         #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr {
-            unsafe { ffi::mux::video_track_base_mut(self.1) }
+            unsafe { ffi::mux::video_track_base_mut(self.1.as_ptr()) }
         }
     }
+
     impl Track for AudioTrack {
         fn is_audio(&self) -> bool { true }
 
         #[doc(hidden)]
-        fn get_segment(&self) -> ffi::mux::SegmentMutPtr { self.0 }
+        fn get_segment(&self) -> ffi::mux::SegmentMutPtr { self.0.as_ptr() }
         #[doc(hidden)]
         fn get_track(&self) -> ffi::mux::TrackMutPtr {
-            unsafe { ffi::mux::audio_track_base_mut(self.1) }
+            unsafe { ffi::mux::audio_track_base_mut(self.1.as_ptr()) }
         }
     }
 
@@ -157,6 +165,7 @@ pub mod mux {
         Opus,
         Vorbis,
     }
+
     impl AudioCodecId {
         fn get_id(&self) -> u32 {
             match self {
@@ -165,12 +174,14 @@ pub mod mux {
             }
         }
     }
+
     #[derive(Eq, PartialEq, Clone, Copy, Debug)]
     pub enum VideoCodecId {
         VP8,
         VP9,
         AV1,
     }
+
     impl VideoCodecId {
         fn get_id(&self) -> u32 {
             match self {
@@ -184,7 +195,7 @@ pub mod mux {
     unsafe impl<W: Send> Send for Segment<W> {}
 
     pub struct Segment<W> {
-        ffi: ffi::mux::SegmentMutPtr,
+        ffi: ffi::mux::SegmentNonNullPtr,
         writer: W,
     }
 
@@ -194,8 +205,9 @@ pub mod mux {
             where W: MkvWriter,
         {
             let ffi = unsafe { ffi::mux::new_segment() };
+            let ffi = NonNull::new(ffi)?;
             let success = unsafe {
-                ffi::mux::initialize_segment(ffi, dest.mkv_writer())
+                ffi::mux::initialize_segment(ffi.as_ptr(), dest.mkv_writer())
             };
             if !success { return None; }
 
@@ -208,7 +220,7 @@ pub mod mux {
         pub fn set_app_name(&mut self, name: &str) {
             let name = std::ffi::CString::new(name).unwrap();
             unsafe {
-                ffi::mux::mux_set_writing_app(self.ffi, name.as_ptr());
+                ffi::mux::mux_set_writing_app(self.ffi.as_ptr(), name.as_ptr());
             }
         }
 
@@ -217,33 +229,57 @@ pub mod mux {
         {
             let mut id_out: u64 = 0;
             let vt = unsafe {
-                ffi::mux::segment_add_video_track(self.ffi, width as i32, height as i32,
-                                                 id.unwrap_or(0), codec.get_id(), &mut id_out)
+                ffi::mux::segment_add_video_track(self.ffi.as_ptr(), width as i32, height as i32,
+                                                  id.unwrap_or(0), codec.get_id(), &mut id_out)
             };
+            assert_ne!(vt, std::ptr::null_mut());
+            let vt = NonNull::new(vt).unwrap();
             VideoTrack(self.ffi, vt, id_out)
+        }
+        pub fn add_video_track_opt(&mut self, width: u32, height: u32,
+                                   id: Option<i32>, codec: VideoCodecId) -> Option<VideoTrack>
+        {
+            let mut id_out: u64 = 0;
+            let vt = unsafe {
+                ffi::mux::segment_add_video_track(self.ffi.as_ptr(), width as i32, height as i32,
+                                                  id.unwrap_or(0), codec.get_id(), &mut id_out)
+            };
+            let vt = NonNull::new(vt)?;
+            Some(VideoTrack(self.ffi, vt, id_out))
         }
 
         pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> bool {
             unsafe {
-                ffi::mux::segment_set_codec_private(self.ffi, track_number, data.as_ptr(), data.len().try_into().unwrap())
+                ffi::mux::segment_set_codec_private(self.ffi.as_ptr(), track_number, data.as_ptr(), data.len().try_into().unwrap())
             }
         }
 
         pub fn add_audio_track(&mut self, sample_rate: i32, channels: i32,
                                id: Option<i32>, codec: AudioCodecId) -> AudioTrack {
             let at = unsafe {
-                ffi::mux::segment_add_audio_track(self.ffi, sample_rate, channels,
+                ffi::mux::segment_add_audio_track(self.ffi.as_ptr(), sample_rate, channels,
                                                   id.unwrap_or(0), codec.get_id())
             };
+            assert_ne!(at, std::ptr::null_mut());
+            let at = NonNull::new(at).unwrap();
             AudioTrack(self.ffi, at)
+        }
+        pub fn add_audio_track_opt(&mut self, sample_rate: i32, channels: i32,
+                                   id: Option<i32>, codec: AudioCodecId) -> Option<AudioTrack> {
+            let at = unsafe {
+                ffi::mux::segment_add_audio_track(self.ffi.as_ptr(), sample_rate, channels,
+                                                  id.unwrap_or(0), codec.get_id())
+            };
+            let at = NonNull::new(at)?;
+            Some(AudioTrack(self.ffi, at))
         }
 
         pub fn try_finalize(self, duration: Option<u64>) -> Result<W, W> {
             let result = unsafe {
-                ffi::mux::finalize_segment(self.ffi, duration.unwrap_or(0))
+                ffi::mux::finalize_segment(self.ffi.as_ptr(), duration.unwrap_or(0))
             };
             unsafe {
-                ffi::mux::delete_segment(self.ffi);
+                ffi::mux::delete_segment(self.ffi.as_ptr());
             }
             if result {
                 Ok(self.writer)
@@ -256,5 +292,22 @@ pub mod mux {
         pub fn finalize(self, duration: Option<u64>) -> bool {
             self.try_finalize(duration).is_ok()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::io::Cursor;
+
+    #[test]
+    fn bad_track_number() {
+        let mut output = Vec::with_capacity(4_000_000); // 4 MB
+        let writer = mux::Writer::new(Cursor::new(&mut output));
+        let mut segment = mux::Segment::new(writer)
+            .expect("Segment should create OK");
+        let mut video_track = segment.add_video_track_opt(420, 420, Some(123456), mux::VideoCodecId::VP8);
+        assert!(video_track.is_none());
     }
 }

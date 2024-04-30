@@ -24,7 +24,7 @@ include = [
 ]
 keywords = ["webm", "mkv", "matroska", "vp9"]
 categories = [ "external-ffi-bindings", "multimedia::encoding", "multimedia::video"]
-version = "1.0.5"
+version = "1.0.6"
 edition = "2021"
 
 [build-dependencies]

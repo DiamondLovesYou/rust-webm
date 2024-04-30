@@ -188,6 +188,8 @@ extern "C" {
   }
 
   int mux_set_color(MuxVideoTrackPtr video, int bits, int sampling_horiz, int sampling_vert, int full_range) {
+    if(video == nullptr) { return 1; }
+
     mkvmuxer::Colour color;
 
     color.set_bits_per_channel(bits);
