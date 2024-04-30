@@ -1,9 +1,11 @@
 
 pub mod mux {
     use std::os::raw::{c_void, c_char, c_int};
+    use std::ptr::NonNull;
 
     pub type IWriter = c_void;
     pub type WriterMutPtr = *mut IWriter;
+    pub type WriterNonNullPtr = NonNull<IWriter>;
 
     pub type WriterWriteFn = extern "C" fn(*mut c_void,
                                            *const c_void,
@@ -23,15 +25,19 @@ pub mod mux {
 
     pub type Segment = c_void;
     pub type SegmentMutPtr = *mut Segment;
+    pub type SegmentNonNullPtr = NonNull<Segment>;
 
     pub type Track = c_void;
     pub type TrackMutPtr = *mut Track;
+    pub type TrackNonNullPtr = NonNull<Track>;
 
     pub type VideoTrack = c_void;
     pub type VideoTrackMutPtr = *mut VideoTrack;
+    pub type VideoTrackNonNullPtr = NonNull<VideoTrack>;
 
     pub type AudioTrack = c_void;
     pub type AudioTrackMutPtr = *mut AudioTrack;
+    pub type AudioTrackNonNullPtr = NonNull<AudioTrack>;
 
 
     #[link(name = "webmadapter", kind = "static")]
