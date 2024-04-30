@@ -70,7 +70,7 @@ pub mod mux {
         #[link_name = "mux_segment_add_video_track"]
         pub fn segment_add_video_track(segment: SegmentMutPtr,
                                        width: i32, height: i32,
-                                       number: i32, codec_id: u32, id_out: *const u64) -> VideoTrackMutPtr;
+                                       number: i32, codec_id: u32, id_out: *mut u64) -> VideoTrackMutPtr;
         #[link_name = "mux_segment_add_audio_track"]
         pub fn segment_add_audio_track(segment: SegmentMutPtr,
                                        sample_rate: i32, channels: i32,

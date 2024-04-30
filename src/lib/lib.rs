@@ -305,9 +305,8 @@ mod tests {
     fn bad_track_number() {
         let mut output = Vec::with_capacity(4_000_000); // 4 MB
         let writer = mux::Writer::new(Cursor::new(&mut output));
-        let mut segment = mux::Segment::new(writer)
-            .expect("Segment should create OK");
-        let mut video_track = segment.add_video_track_opt(420, 420, Some(123456), mux::VideoCodecId::VP8);
+        let mut segment = mux::Segment::new(writer).expect("Segment should create OK");
+        let video_track = segment.add_video_track_opt(420, 420, Some(123456), mux::VideoCodecId::VP8);
         assert!(video_track.is_none());
     }
 }
