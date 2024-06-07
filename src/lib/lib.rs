@@ -128,7 +128,7 @@ pub mod mux {
             let (sampling_horiz, sampling_vert) = subsampling;
             fn to_int(b: bool) -> i32 { if b { 1 } else { 0 } }
             unsafe {
-                ffi::mux::mux_set_color(self.get_track(), bit_depth.into(), to_int(sampling_horiz), to_int(sampling_vert), to_int(full_range)) != 0
+                ffi::mux::mux_set_color(self.get_track().cast(), bit_depth.into(), to_int(sampling_horiz), to_int(sampling_vert), to_int(full_range)) != 0
             }
         }
 

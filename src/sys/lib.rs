@@ -3,7 +3,8 @@ pub mod mux {
     use std::os::raw::{c_void, c_char, c_int};
     use std::ptr::NonNull;
 
-    pub type IWriter = c_void;
+    #[repr(C)]
+    pub struct IWriter { _opaque_c_aligned: *mut c_void }
     pub type WriterMutPtr = *mut IWriter;
     pub type WriterNonNullPtr = NonNull<IWriter>;
 
@@ -23,19 +24,23 @@ pub mod mux {
     pub const VP9_CODEC_ID: u32 = 1;
     pub const AV1_CODEC_ID: u32 = 2;
 
-    pub type Segment = c_void;
+    #[repr(C)]
+    pub struct Segment { _opaque_c_aligned: *mut c_void }
     pub type SegmentMutPtr = *mut Segment;
     pub type SegmentNonNullPtr = NonNull<Segment>;
 
-    pub type Track = c_void;
+    #[repr(C)]
+    pub struct Track { _opaque_c_aligned: *mut c_void }
     pub type TrackMutPtr = *mut Track;
     pub type TrackNonNullPtr = NonNull<Track>;
 
-    pub type VideoTrack = c_void;
+    #[repr(C)]
+    pub struct VideoTrack(Track);
     pub type VideoTrackMutPtr = *mut VideoTrack;
     pub type VideoTrackNonNullPtr = NonNull<VideoTrack>;
 
-    pub type AudioTrack = c_void;
+    #[repr(C)]
+    pub struct AudioTrack(Track);
     pub type AudioTrackMutPtr = *mut AudioTrack;
     pub type AudioTrackNonNullPtr = NonNull<AudioTrack>;
 
