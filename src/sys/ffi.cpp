@@ -132,13 +132,13 @@ extern "C" {
   const uint32_t AV1_CODEC_ID = 2;
 
   bool mux_segment_set_codec_private(MuxSegmentPtr segment, uint64_t number, const uint8_t *data, int len) {
-    mkvmuxer::VideoTrack *const video_track = static_cast<mkvmuxer::VideoTrack *>(segment->GetTrackByNumber(number));
-    if (!video_track) {
-      fprintf(stderr, "Video track creation failed.\n");
+    MuxTrackPtr track = segment->GetTrackByNumber(number);
+    if (!track) {
+      fprintf(stderr, "No such track with that number.\n");
       return false;
     }
-    if (!video_track->SetCodecPrivate(data, len)) {
-      fprintf(stderr, "Video track SetCodecPrivate failed.\n");
+    if (!track->SetCodecPrivate(data, len)) {
+      fprintf(stderr, "Track SetCodecPrivate failed.\n");
       return false;
     }
     return true;
