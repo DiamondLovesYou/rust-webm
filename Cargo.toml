@@ -1,5 +1,5 @@
 [package]
-version = "1.1.1"
+version = "1.1.2"
 authors = [
     "Kornel Lesiński <kornel@geekhood.net>",
     "Richard Diamond <wichard@vitalitystudios.com>",
@@ -15,7 +15,7 @@ categories = [ "multimedia::video", "multimedia::encoding", "api-bindings" ]
 edition = "2021"
 
 [dependencies]
-webm-sys = { version = "1.0.6", path = "src/sys" }
+webm-sys = { version = "1.0.7", path = "src/sys" }
 
 [lib]
 name = "webm"

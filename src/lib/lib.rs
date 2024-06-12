@@ -91,11 +91,13 @@ pub mod mux {
     }
 
     #[derive(Clone)]
+    /// Clone only increments reference count, it's still one track
     pub struct VideoTrack(Weak<Mutex<ffi::mux::SegmentNonNullPtr>>,
                           ffi::mux::VideoTrackNonNullPtr,
                           u64);
 
     #[derive(Clone)]
+    /// Clone only increments reference count, it's still one track
     pub struct AudioTrack(Weak<Mutex<ffi::mux::SegmentNonNullPtr>>,
                           ffi::mux::AudioTrackNonNullPtr);
 
