@@ -80,12 +80,15 @@ pub mod mux {
                 let result = data.dest.write(buf);
                 if let Ok(num_bytes) = result {
                     // Guard against a future universe where sizeof(usize) > sizeof(u64)
-                    let num_bytes: u64 = num_bytes.try_into().unwrap();
+                    let num_bytes_u64: u64 = num_bytes.try_into().unwrap();
 
-                    data.bytes_written += num_bytes;
+                    data.bytes_written += num_bytes_u64;
+
+                    // Partial writes are considered failure
+                    num_bytes == len
+                } else {
+                    false
                 }
-
-                result.is_ok()
             }
 
             let mut writer_data = Box::pin(MuxWriterData {
