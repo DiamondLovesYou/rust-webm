@@ -11,6 +11,13 @@ pub mod mux {
     use std::ptr::NonNull;
     use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
+    /// Structure for writing a muxed WebM stream to the user-supplied write destination `T`.
+    ///
+    /// `T` may be a file, an `std::io::Cursor` over a byte array, or anything implementing the [`Write`] trait.
+    /// It is recommended, but not required, that `T` also implement [`Seek`]. This allows the resulting WebM
+    /// file to have things like seeking headers and a stream duration known upfront.
+    ///
+    /// Once this [`Writer`] is created, you can use it to create one or more [`Segment`]s.
     pub struct Writer<T>
     where
         T: Write,
@@ -23,6 +30,8 @@ pub mod mux {
 
     struct MuxWriterData<T> {
         dest: T,
+
+        /// Used for tracking position when using a non-Seek write destination
         bytes_written: u64,
     }
 
@@ -30,6 +39,8 @@ pub mod mux {
     where
         T: Write,
     {
+        /// Creates a [`Writer`] for a destination that does not support [`Seek`].
+        /// If it does support [`Seek`], you should use [`Writer::new()`] instead.
         pub fn new_non_seek(dest: T) -> Writer<T> {
             extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64 {
                 // The user-supplied writer does not track its own position.
@@ -41,6 +52,8 @@ pub mod mux {
             Self::make_writer(dest, get_pos_fn::<T>, None)
         }
 
+        /// Consumes this [`Writer`], and returns the user-supplied write destination
+        /// that it was created with.
         #[must_use]
         pub fn unwrap(self) -> T {
             unsafe {
@@ -101,6 +114,8 @@ pub mod mux {
     where
         T: Write + Seek,
     {
+        /// Creates a [`Writer`] for a destination that supports [`Seek`].
+        /// If it does not support [`Seek`], you should use [`Writer::new_non_seek()`] instead.
         pub fn new(dest: T) -> Writer<T> {
             use std::io::SeekFrom;
 
