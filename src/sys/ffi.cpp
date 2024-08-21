@@ -65,6 +65,7 @@ extern "C" {
                               FfiMkvWriter::SetPositionFun set_position,
                               FfiMkvWriter::ElementStartNotifyFun element_start_notify,
                               void* user_data) {
+    // Even for non-seekable streams, the writer will query the current position
     if(write == nullptr || get_position == nullptr) {
       return nullptr;
     }
