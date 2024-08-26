@@ -148,7 +148,7 @@ pub mod mux {
 
     impl<T> MkvWriter for Writer<T>
     where
-        T: Write + Seek,
+        T: Write,
     {
         fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
             self.mkv_writer.as_ptr()
