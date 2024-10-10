@@ -3,35 +3,33 @@ extern crate webm_sys as ffi;
 pub mod mux {
     mod writer;
 
+    pub use ffi::mux::TrackNum;
     pub use writer::Writer;
 
-    use ffi::mux::{ResultCode, TrackNum};
+    use ffi::mux::ResultCode;
     use writer::MkvWriter;
 
     use crate::ffi;
 
     use std::ptr::NonNull;
-    use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
     #[derive(Clone)]
-    /// Clone only increments reference count, it's still one track
-    pub struct VideoTrack(Weak<Mutex<ffi::mux::SegmentNonNullPtr>>, TrackNum);
+    pub struct VideoTrack(TrackNum);
 
     #[derive(Clone)]
-    /// Clone only increments reference count, it's still one track
-    pub struct AudioTrack(Weak<Mutex<ffi::mux::SegmentNonNullPtr>>, TrackNum);
+    pub struct AudioTrack(TrackNum);
 
     impl Eq for VideoTrack {}
     impl PartialEq for VideoTrack {
         fn eq(&self, track: &VideoTrack) -> bool {
-            self.1 == track.1
+            self.0 == track.0
         }
     }
 
     impl Eq for AudioTrack {}
     impl PartialEq for AudioTrack {
         fn eq(&self, track: &AudioTrack) -> bool {
-            self.1 == track.1
+            self.0 == track.0
         }
     }
 
@@ -47,58 +45,8 @@ pub mod mux {
             false
         }
 
-        fn add_frame(&mut self, data: &[u8], timestamp_ns: u64, keyframe: bool) -> bool {
-            unsafe {
-                let segment = self.get_segment();
-                let segment = segment.lock().unwrap();
-                let result = ffi::mux::segment_add_frame(
-                    segment.as_ptr(),
-                    self.track_number(),
-                    data.as_ptr(),
-                    data.len(),
-                    timestamp_ns,
-                    keyframe,
-                );
-                result == ResultCode::Ok
-            }
-        }
-
-        #[doc(hidden)]
-        unsafe fn get_segment(&self) -> Arc<Mutex<ffi::mux::SegmentNonNullPtr>>;
-
         #[must_use]
         fn track_number(&self) -> TrackNum;
-    }
-
-    impl VideoTrack {
-        pub fn set_color(
-            &mut self,
-            bit_depth: u8,
-            subsampling: (bool, bool),
-            full_range: bool,
-        ) -> bool {
-            let (sampling_horiz, sampling_vert) = subsampling;
-            fn to_int(b: bool) -> i32 {
-                if b {
-                    1
-                } else {
-                    0
-                }
-            }
-            unsafe {
-                let segment = self.get_segment();
-                let segment = segment.lock().unwrap();
-                let result = ffi::mux::mux_set_color(
-                    segment.as_ptr(),
-                    self.track_number(),
-                    bit_depth.into(),
-                    to_int(sampling_horiz),
-                    to_int(sampling_vert),
-                    to_int(full_range),
-                );
-                result == ResultCode::Ok
-            }
-        }
     }
 
     impl Track for VideoTrack {
@@ -106,14 +54,9 @@ pub mod mux {
             true
         }
 
-        #[doc(hidden)]
-        unsafe fn get_segment(&self) -> Arc<Mutex<ffi::mux::SegmentNonNullPtr>> {
-            self.0.upgrade().expect("segment dropped before track")
-        }
-
         #[must_use]
         fn track_number(&self) -> TrackNum {
-            self.1
+            self.0
         }
     }
 
@@ -123,13 +66,8 @@ pub mod mux {
         }
 
         #[doc(hidden)]
-        unsafe fn get_segment(&self) -> Arc<Mutex<ffi::mux::SegmentNonNullPtr>> {
-            self.0.upgrade().expect("segment dropped before track")
-        }
-
-        #[doc(hidden)]
         fn track_number(&self) -> TrackNum {
-            self.1
+            self.0
         }
     }
 
@@ -167,8 +105,18 @@ pub mod mux {
 
     unsafe impl<W: Send> Send for Segment<W> {}
 
+    /// The error type for this entire crate. More specific error types will
+    /// be added in the future, hence the current marking as non-exhaustive.
+    #[derive(Debug)]
+    #[non_exhaustive]
+    pub enum Error {
+        /// An unknown error occurred. While this is typically the result of
+        /// incorrect parameters to methods, this is not a guarantee.
+        Unknown,
+    }
+
     pub struct Segment<W> {
-        ffi: Option<Arc<Mutex<ffi::mux::SegmentNonNullPtr>>>,
+        ffi: Option<ffi::mux::SegmentNonNullPtr>,
         writer: Option<W>,
     }
 
@@ -186,24 +134,20 @@ pub mod mux {
             }
 
             Some(Segment {
-                ffi: Some(Arc::new(Mutex::new(ffi))),
+                ffi: Some(ffi),
                 writer: Some(dest),
             })
         }
 
-        fn segment_ptr(&self) -> MutexGuard<ffi::mux::SegmentNonNullPtr> {
-            self.ffi.as_ref().unwrap().lock().unwrap()
-        }
-
-        fn weak_segment_ptr(&self) -> Weak<Mutex<ffi::mux::SegmentNonNullPtr>> {
-            Arc::downgrade(&self.ffi.as_ref().unwrap())
+        fn segment_ptr(&self) -> ffi::mux::SegmentNonNullPtr {
+            *self.ffi.as_ref().unwrap()
         }
 
         pub fn set_app_name(&mut self, name: &str) {
             let name = std::ffi::CString::new(name).unwrap();
-            let ffi_lock = self.segment_ptr();
+            let ffi = self.segment_ptr();
             unsafe {
-                ffi::mux::mux_set_writing_app(ffi_lock.as_ptr(), name.as_ptr());
+                ffi::mux::mux_set_writing_app(ffi.as_ptr(), name.as_ptr());
             }
         }
 
@@ -215,10 +159,10 @@ pub mod mux {
             codec: VideoCodecId,
         ) -> VideoTrack {
             let mut track_num_out: TrackNum = 0;
-            let ffi_lock = self.segment_ptr();
+            let ffi = self.segment_ptr();
             let result = unsafe {
                 ffi::mux::segment_add_video_track(
-                    ffi_lock.as_ptr(),
+                    ffi.as_ptr(),
                     width as i32,
                     height as i32,
                     id.unwrap_or(0),
@@ -227,7 +171,7 @@ pub mod mux {
                 )
             };
             assert_eq!(result, ResultCode::Ok);
-            VideoTrack(self.weak_segment_ptr(), track_num_out)
+            VideoTrack(track_num_out)
         }
 
         pub fn add_video_track_opt(
@@ -238,10 +182,10 @@ pub mod mux {
             codec: VideoCodecId,
         ) -> Option<VideoTrack> {
             let mut track_num_out: TrackNum = 0;
-            let ffi_lock = self.segment_ptr();
+            let ffi = self.segment_ptr();
             let result = unsafe {
                 ffi::mux::segment_add_video_track(
-                    ffi_lock.as_ptr(),
+                    ffi.as_ptr(),
                     width as i32,
                     height as i32,
                     id.unwrap_or(0),
@@ -253,14 +197,14 @@ pub mod mux {
                 return None;
             }
 
-            Some(VideoTrack(self.weak_segment_ptr(), track_num_out))
+            Some(VideoTrack(track_num_out))
         }
 
         pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> bool {
-            let ffi_lock = self.segment_ptr();
+            let ffi = self.segment_ptr();
             unsafe {
                 let result = ffi::mux::segment_set_codec_private(
-                    ffi_lock.as_ptr(),
+                    ffi.as_ptr(),
                     track_number,
                     data.as_ptr(),
                     data.len().try_into().unwrap(),
@@ -277,10 +221,10 @@ pub mod mux {
             codec: AudioCodecId,
         ) -> AudioTrack {
             let mut track_num_out: TrackNum = 0;
-            let ffi_lock = self.segment_ptr();
+            let ffi = self.segment_ptr();
             let result = unsafe {
                 ffi::mux::segment_add_audio_track(
-                    ffi_lock.as_ptr(),
+                    ffi.as_ptr(),
                     sample_rate,
                     channels,
                     id.unwrap_or(0),
@@ -289,7 +233,7 @@ pub mod mux {
                 )
             };
             assert_eq!(result, ResultCode::Ok);
-            AudioTrack(self.weak_segment_ptr(), track_num_out)
+            AudioTrack(track_num_out)
         }
         pub fn add_audio_track_opt(
             &mut self,
@@ -299,10 +243,10 @@ pub mod mux {
             codec: AudioCodecId,
         ) -> Option<AudioTrack> {
             let mut track_num_out: TrackNum = 0;
-            let ffi_lock = self.segment_ptr();
+            let ffi = self.segment_ptr();
             let result = unsafe {
                 ffi::mux::segment_add_audio_track(
-                    ffi_lock.as_ptr(),
+                    ffi.as_ptr(),
                     sample_rate,
                     channels,
                     id.unwrap_or(0),
@@ -313,18 +257,83 @@ pub mod mux {
             if result != ResultCode::Ok {
                 return None;
             }
-            Some(AudioTrack(self.weak_segment_ptr(), track_num_out))
+            Some(AudioTrack(track_num_out))
+        }
+
+        /// Sets color information for the specified video track.
+        ///
+        /// This method will fail if called after the first frame has been written.
+        pub fn set_color(
+            &mut self,
+            track: &VideoTrack,
+            bit_depth: u8,
+            subsampling: (bool, bool),
+            full_range: bool,
+        ) -> Result<(), Error> {
+            let (sampling_horiz, sampling_vert) = subsampling;
+            fn to_int(b: bool) -> i32 {
+                if b {
+                    1
+                } else {
+                    0
+                }
+            }
+
+            let result = unsafe {
+                ffi::mux::mux_set_color(
+                    self.ffi.unwrap().as_ptr(),
+                    track.track_number(),
+                    bit_depth.into(),
+                    to_int(sampling_horiz),
+                    to_int(sampling_vert),
+                    to_int(full_range),
+                )
+            };
+
+            match result {
+                ResultCode::Ok => Ok(()),
+                _ => Err(Error::Unknown),
+            }
+        }
+
+        /// Adds a frame to the track with the specified track number. If you have a [`VideoTrack`] or
+        /// [`AudioTrack`], you can call `track_number()` to get the underlying [`TrackNum`].
+        ///
+        /// The timestamp must be in nanosecond units, and must be monotonically increasing with respect to all other
+        /// timestamps written so far, including those of other tracks! Repeating the last written timestamp is allowed,
+        /// however players generally don't handle this well if both such frames are on the same track.
+        pub fn add_frame(
+            &mut self,
+            track_num: TrackNum,
+            data: &[u8],
+            timestamp_ns: u64,
+            keyframe: bool,
+        ) -> Result<(), Error> {
+            let result = unsafe {
+                ffi::mux::segment_add_frame(
+                    self.ffi.unwrap().as_ptr(),
+                    track_num,
+                    data.as_ptr(),
+                    data.len(),
+                    timestamp_ns,
+                    keyframe,
+                )
+            };
+
+            match result {
+                ResultCode::Ok => Ok(()),
+                _ => Err(Error::Unknown),
+            }
         }
 
         pub fn try_finalize(mut self, duration: Option<u64>) -> Result<W, W> {
             let result = unsafe {
-                let ffi_lock = self.segment_ptr();
-                ffi::mux::finalize_segment(ffi_lock.as_ptr(), duration.unwrap_or(0))
+                let ffi = self.segment_ptr();
+                ffi::mux::finalize_segment(ffi.as_ptr(), duration.unwrap_or(0))
             };
-            // tracks have weak refs, so into_inner should work as long as there's no race condition
-            let mut segment = Arc::into_inner(self.ffi.take().unwrap()).expect("segment is in use");
+            let segment = self.ffi.take().unwrap();
             unsafe {
-                ffi::mux::delete_segment(segment.get_mut().unwrap().as_ptr());
+                ffi::mux::delete_segment(segment.as_ptr());
             }
             let writer = self.writer.take().unwrap();
 
@@ -343,11 +352,9 @@ pub mod mux {
 
     impl<W> Drop for Segment<W> {
         fn drop(&mut self) {
-            if let Some(mut segment) = self.ffi.take().and_then(Arc::into_inner) {
-                if let Ok(ptr) = segment.get_mut() {
-                    unsafe {
-                        ffi::mux::delete_segment(ptr.as_ptr());
-                    }
+            if let Some(segment) = self.ffi.take() {
+                unsafe {
+                    ffi::mux::delete_segment(segment.as_ptr());
                 }
             }
         }
@@ -357,7 +364,6 @@ pub mod mux {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mux::Track;
     use std::io::Cursor;
 
     #[test]
@@ -368,28 +374,5 @@ mod tests {
         let video_track =
             segment.add_video_track_opt(420, 420, Some(123456), mux::VideoCodecId::VP8);
         assert!(video_track.is_none());
-    }
-
-    #[test]
-    #[should_panic = "segment dropped"]
-    fn uaf() {
-        let writer = crate::mux::Writer::new(std::io::Cursor::new(Vec::new()));
-        let mut segment = crate::mux::Segment::new(writer).unwrap();
-        let mut audio_track =
-            segment.add_audio_track(48000, 1, None, crate::mux::AudioCodecId::Opus);
-
-        drop(segment);
-        audio_track.add_frame(&[], 0, true);
-    }
-
-    #[test]
-    #[should_panic = "segment dropped"]
-    fn finalized() {
-        let writer = crate::mux::Writer::new(std::io::Cursor::new(Vec::new()));
-        let mut segment = crate::mux::Segment::new(writer).unwrap();
-        let mut audio_track =
-            segment.add_audio_track(44000, 1, None, crate::mux::AudioCodecId::Vorbis);
-        segment.finalize(None);
-        audio_track.add_frame(&[], 0, true);
     }
 }
