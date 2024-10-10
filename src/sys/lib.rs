@@ -14,6 +14,9 @@ pub mod mux {
     pub type WriterSetPosFn = extern "C" fn(*mut c_void, u64) -> bool;
     pub type WriterElementStartNotifyFn = extern "C" fn(*mut c_void, u64, i64);
 
+    /// An opaque number used to identify an added track.
+    pub type TrackNum = u64;
+
     // audio
     pub const OPUS_CODEC_ID: u32 = 0;
     pub const VORBIS_CODEC_ID: u32 = 1;
@@ -89,7 +92,7 @@ pub mod mux {
             height: i32,
             number: i32,
             codec_id: u32,
-            id_out: *mut u64,
+            track_num_out: *mut TrackNum,
         ) -> VideoTrackMutPtr;
         #[link_name = "mux_segment_add_audio_track"]
         pub fn segment_add_audio_track(
@@ -98,11 +101,12 @@ pub mod mux {
             channels: i32,
             number: i32,
             codec_id: u32,
+            track_num_out: *mut TrackNum,
         ) -> AudioTrackMutPtr;
         #[link_name = "mux_segment_add_frame"]
         pub fn segment_add_frame(
             segment: SegmentMutPtr,
-            track: TrackMutPtr,
+            track_num: TrackNum,
             frame: *const u8,
             length: usize,
             timestamp_ns: u64,
@@ -111,7 +115,7 @@ pub mod mux {
         #[link_name = "mux_segment_set_codec_private"]
         pub fn segment_set_codec_private(
             segment: SegmentMutPtr,
-            number: u64,
+            number: TrackNum,
             data: *const u8,
             len: i32,
         ) -> bool;

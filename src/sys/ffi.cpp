@@ -12,6 +12,7 @@
 
 extern "C" {
 
+  using TrackNum = uint64_t;
   typedef mkvmuxer::IMkvWriter* MkvWriterPtr;
 
   struct FfiMkvWriter: public mkvmuxer::IMkvWriter {
@@ -132,7 +133,7 @@ extern "C" {
   const uint32_t VP9_CODEC_ID = 1;
   const uint32_t AV1_CODEC_ID = 2;
 
-  bool mux_segment_set_codec_private(MuxSegmentPtr segment, uint64_t number, const uint8_t *data, int len) {
+  bool mux_segment_set_codec_private(MuxSegmentPtr segment, TrackNum number, const uint8_t *data, int len) {
     MuxTrackPtr track = segment->GetTrackByNumber(number);
     if (!track) {
       fprintf(stderr, "No such track with that number.\n");
@@ -147,8 +148,8 @@ extern "C" {
 
   MuxVideoTrackPtr mux_segment_add_video_track(MuxSegmentPtr segment, const int32_t width,
                                                const int32_t height, const int32_t number,
-                                               const uint32_t codec_id, uint64_t* id_out) {
-    if(segment == nullptr) { return nullptr; }
+                                               const uint32_t codec_id, TrackNum* track_num_out) {
+    if(segment == nullptr || track_num_out == nullptr) { return nullptr; }
 
     const char* codec_id_str = nullptr;
     switch(codec_id) {
@@ -158,19 +159,19 @@ extern "C" {
     default: return nullptr;
     }
 
-    const auto id = segment->AddVideoTrack(width, height, number);
-    if(id == 0) { return nullptr; }
+    TrackNum track_num = segment->AddVideoTrack(width, height, number);
+    if(track_num == 0) { return nullptr; }
 
-    auto video = static_cast<MuxVideoTrackPtr>(segment->GetTrackByNumber(id));
+    auto video = static_cast<MuxVideoTrackPtr>(segment->GetTrackByNumber(track_num));
     video->set_codec_id(codec_id_str);
 
-    *id_out = id;
+    *track_num_out = track_num;
     return video;
   }
   MuxAudioTrackPtr mux_segment_add_audio_track(MuxSegmentPtr segment, const int32_t sample_rate,
                                                const int32_t channels, const int32_t number,
-                                               const uint32_t codec_id) {
-    if(segment == nullptr) { return nullptr; }
+                                               const uint32_t codec_id, TrackNum* track_num_out) {
+    if(segment == nullptr || track_num_out == nullptr) { return nullptr; }
 
     const char* codec_id_str = nullptr;
     switch(codec_id) {
@@ -179,12 +180,13 @@ extern "C" {
     default: return nullptr;
     }
 
-    const auto id = segment->AddAudioTrack(sample_rate, channels, number);
-    if(id == 0) { return nullptr; }
+    const auto track_num = segment->AddAudioTrack(sample_rate, channels, number);
+    if(track_num == 0) { return nullptr; }
 
-    auto audio = static_cast<MuxAudioTrackPtr>(segment->GetTrackByNumber(id));
+    auto audio = static_cast<MuxAudioTrackPtr>(segment->GetTrackByNumber(track_num));
     audio->set_codec_id(codec_id_str);
 
+    *track_num_out = track_num;
     return audio;
   }
 
@@ -201,13 +203,12 @@ extern "C" {
     return video->SetColour(color);
   }
 
-  bool mux_segment_add_frame(MuxSegmentPtr segment, MuxTrackPtr track,
+  bool mux_segment_add_frame(MuxSegmentPtr segment, TrackNum track_num,
                              const uint8_t* frame, const size_t length,
                              const uint64_t timestamp_ns, const bool keyframe) {
-    if(segment == nullptr || track == nullptr) { return false; }
+    if(segment == nullptr) { return false; }
 
-    return segment->AddFrame(frame, length, track->number(),
-                             timestamp_ns, keyframe);
+    return segment->AddFrame(frame, length, track_num, timestamp_ns, keyframe);
   }
 
 }
