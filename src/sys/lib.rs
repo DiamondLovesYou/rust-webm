@@ -43,12 +43,10 @@ pub mod mux {
     #[repr(C)]
     pub struct VideoTrack(Track);
     pub type VideoTrackMutPtr = *mut VideoTrack;
-    pub type VideoTrackNonNullPtr = NonNull<VideoTrack>;
 
     #[repr(C)]
     pub struct AudioTrack(Track);
     pub type AudioTrackMutPtr = *mut AudioTrack;
-    pub type AudioTrackNonNullPtr = NonNull<AudioTrack>;
 
     #[link(name = "webmadapter", kind = "static")]
     extern "C" {
@@ -68,7 +66,8 @@ pub mod mux {
         #[link_name = "mux_initialize_segment"]
         pub fn initialize_segment(segment: SegmentMutPtr, writer: WriterMutPtr) -> bool;
         pub fn mux_set_color(
-            segment: VideoTrackMutPtr,
+            segment: SegmentMutPtr,
+            video_track_num: TrackNum,
             bits: c_int,
             sampling_horiz: c_int,
             sampling_vert: c_int,
@@ -79,11 +78,6 @@ pub mod mux {
         pub fn finalize_segment(segment: SegmentMutPtr, duration: u64) -> bool;
         #[link_name = "mux_delete_segment"]
         pub fn delete_segment(segment: SegmentMutPtr);
-
-        #[link_name = "mux_video_track_base_mut"]
-        pub fn video_track_base_mut(track: VideoTrackMutPtr) -> TrackMutPtr;
-        #[link_name = "mux_audio_track_base_mut"]
-        pub fn audio_track_base_mut(track: AudioTrackMutPtr) -> TrackMutPtr;
 
         #[link_name = "mux_segment_add_video_track"]
         pub fn segment_add_video_track(

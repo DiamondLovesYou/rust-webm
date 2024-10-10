@@ -111,19 +111,6 @@ extern "C" {
   typedef mkvmuxer::VideoTrack* MuxVideoTrackPtr;
   typedef mkvmuxer::AudioTrack* MuxAudioTrackPtr;
 
-  MuxTrackPtr mux_video_track_base_mut(MuxVideoTrackPtr video_track) {
-    return static_cast<MuxTrackPtr>(video_track);
-  }
-  MuxTrackPtr mux_audio_track_base_mut(MuxAudioTrackPtr audio_track) {
-    return static_cast<MuxTrackPtr>(audio_track);
-  }
-  const MuxTrackPtr mux_video_track_base_const(const MuxVideoTrackPtr video_track) {
-    return static_cast<const MuxTrackPtr>(video_track);
-  }
-  const MuxTrackPtr mux_audio_track_base_const(const MuxAudioTrackPtr audio_track) {
-    return static_cast<const MuxTrackPtr>(audio_track);
-  }
-
   // audio
   const uint32_t OPUS_CODEC_ID = 0;
   const uint32_t VORBIS_CODEC_ID = 1;
@@ -190,10 +177,12 @@ extern "C" {
     return audio;
   }
 
-  int mux_set_color(MuxVideoTrackPtr video, int bits, int sampling_horiz, int sampling_vert, int full_range) {
-    if(video == nullptr) { return 1; }
-
+  int mux_set_color(MuxSegmentPtr segment, TrackNum video_track_num, int bits, int sampling_horiz, int sampling_vert, int full_range) {
     mkvmuxer::Colour color;
+
+    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return 1; }
+    auto video = static_cast<MuxVideoTrackPtr>(track);
 
     color.set_bits_per_channel(bits);
     color.set_chroma_subsampling_horz(sampling_horiz);
