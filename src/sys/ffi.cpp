@@ -11,6 +11,11 @@
 #include <assert.h>
 
 extern "C" {
+  enum class ResultCode: int32_t {
+    Ok = 0,
+    BadParam = -1,
+    UnknownLibwebmError = -2,
+  };
 
   using TrackNum = uint64_t;
   typedef mkvmuxer::IMkvWriter* MkvWriterPtr;
@@ -90,18 +95,20 @@ extern "C" {
   MuxSegmentPtr mux_new_segment() {
     return new mkvmuxer::Segment();
   }
-  bool mux_initialize_segment(MuxSegmentPtr segment, MkvWriterPtr writer) {
-    return segment->Init(writer);
+  ResultCode mux_initialize_segment(MuxSegmentPtr segment, MkvWriterPtr writer) {
+    bool success = segment->Init(writer);
+    return success ? ResultCode::Ok : ResultCode::UnknownLibwebmError;
   }
   void mux_set_writing_app(MuxSegmentPtr segment, const char *name) {
     auto info = segment->GetSegmentInfo();
     info->set_writing_app(name);
   }
-  bool mux_finalize_segment(MuxSegmentPtr segment, uint64_t timeCodeDuration) {
+  ResultCode mux_finalize_segment(MuxSegmentPtr segment, uint64_t timeCodeDuration) {
     if (timeCodeDuration) {
       segment->set_duration(timeCodeDuration);
     }
-    return segment->Finalize();
+    bool success = segment->Finalize();
+    return success ? ResultCode::Ok : ResultCode::UnknownLibwebmError;
   }
   void mux_delete_segment(MuxSegmentPtr segment) {
     delete segment;
@@ -120,68 +127,62 @@ extern "C" {
   const uint32_t VP9_CODEC_ID = 1;
   const uint32_t AV1_CODEC_ID = 2;
 
-  bool mux_segment_set_codec_private(MuxSegmentPtr segment, TrackNum number, const uint8_t *data, int len) {
-    MuxTrackPtr track = segment->GetTrackByNumber(number);
-    if (!track) {
-      fprintf(stderr, "No such track with that number.\n");
-      return false;
-    }
-    if (!track->SetCodecPrivate(data, len)) {
-      fprintf(stderr, "Track SetCodecPrivate failed.\n");
-      return false;
-    }
-    return true;
+  ResultCode mux_segment_set_codec_private(MuxSegmentPtr segment, TrackNum track_num, const uint8_t *data, int len) {
+    MuxTrackPtr track = segment->GetTrackByNumber(track_num);
+    if (!track) { return ResultCode::BadParam; }
+    if (!track->SetCodecPrivate(data, len)) { return ResultCode::UnknownLibwebmError; }
+    return ResultCode::Ok;
   }
 
-  MuxVideoTrackPtr mux_segment_add_video_track(MuxSegmentPtr segment, const int32_t width,
+  ResultCode mux_segment_add_video_track(MuxSegmentPtr segment, const int32_t width,
                                                const int32_t height, const int32_t number,
                                                const uint32_t codec_id, TrackNum* track_num_out) {
-    if(segment == nullptr || track_num_out == nullptr) { return nullptr; }
+    if(segment == nullptr || track_num_out == nullptr) { return ResultCode::BadParam; }
 
     const char* codec_id_str = nullptr;
     switch(codec_id) {
     case VP8_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kVp8CodecId; break;
     case VP9_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kVp9CodecId; break;
     case AV1_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kAv1CodecId; break;
-    default: return nullptr;
+    default: return ResultCode::BadParam;
     }
 
     TrackNum track_num = segment->AddVideoTrack(width, height, number);
-    if(track_num == 0) { return nullptr; }
+    if(track_num == 0) { return ResultCode::UnknownLibwebmError; }
 
     auto video = static_cast<MuxVideoTrackPtr>(segment->GetTrackByNumber(track_num));
     video->set_codec_id(codec_id_str);
 
     *track_num_out = track_num;
-    return video;
+    return ResultCode::Ok;
   }
-  MuxAudioTrackPtr mux_segment_add_audio_track(MuxSegmentPtr segment, const int32_t sample_rate,
+  ResultCode mux_segment_add_audio_track(MuxSegmentPtr segment, const int32_t sample_rate,
                                                const int32_t channels, const int32_t number,
                                                const uint32_t codec_id, TrackNum* track_num_out) {
-    if(segment == nullptr || track_num_out == nullptr) { return nullptr; }
+    if(segment == nullptr || track_num_out == nullptr) { return ResultCode::BadParam; }
 
     const char* codec_id_str = nullptr;
     switch(codec_id) {
     case OPUS_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kOpusCodecId; break;
     case VORBIS_CODEC_ID: codec_id_str = mkvmuxer::Tracks::kVorbisCodecId; break;
-    default: return nullptr;
+    default: return ResultCode::BadParam;
     }
 
     const auto track_num = segment->AddAudioTrack(sample_rate, channels, number);
-    if(track_num == 0) { return nullptr; }
+    if(track_num == 0) { return ResultCode::UnknownLibwebmError; }
 
     auto audio = static_cast<MuxAudioTrackPtr>(segment->GetTrackByNumber(track_num));
     audio->set_codec_id(codec_id_str);
 
     *track_num_out = track_num;
-    return audio;
+    return ResultCode::Ok;
   }
 
-  int mux_set_color(MuxSegmentPtr segment, TrackNum video_track_num, int bits, int sampling_horiz, int sampling_vert, int full_range) {
+  ResultCode mux_set_color(MuxSegmentPtr segment, TrackNum video_track_num, int bits, int sampling_horiz, int sampling_vert, int full_range) {
     mkvmuxer::Colour color;
 
     MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
-    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return 1; }
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
     auto video = static_cast<MuxVideoTrackPtr>(track);
 
     color.set_bits_per_channel(bits);
@@ -189,15 +190,18 @@ extern "C" {
     color.set_chroma_subsampling_vert(sampling_vert);
 
     color.set_range(full_range ? mkvmuxer::Colour::kFullRange : mkvmuxer::Colour::kBroadcastRange);
-    return video->SetColour(color);
+    bool success = video->SetColour(color);
+
+    return success ? ResultCode::Ok : ResultCode::UnknownLibwebmError;
   }
 
-  bool mux_segment_add_frame(MuxSegmentPtr segment, TrackNum track_num,
+  ResultCode mux_segment_add_frame(MuxSegmentPtr segment, TrackNum track_num,
                              const uint8_t* frame, const size_t length,
                              const uint64_t timestamp_ns, const bool keyframe) {
-    if(segment == nullptr) { return false; }
+    if(segment == nullptr) { return ResultCode::BadParam; }
 
-    return segment->AddFrame(frame, length, track_num, timestamp_ns, keyframe);
+    bool success = segment->AddFrame(frame, length, track_num, timestamp_ns, keyframe);
+    return success ? ResultCode::Ok : ResultCode::UnknownLibwebmError;
   }
 
 }

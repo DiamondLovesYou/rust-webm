@@ -1,6 +1,6 @@
 pub mod mux {
-    use std::os::raw::{c_char, c_int, c_void};
-    use std::ptr::NonNull;
+    use core::ffi::{c_char, c_int, c_void};
+    use core::ptr::NonNull;
 
     #[repr(C)]
     pub struct IWriter {
@@ -16,6 +16,21 @@ pub mod mux {
 
     /// An opaque number used to identify an added track.
     pub type TrackNum = u64;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[repr(i32)]
+    pub enum ResultCode {
+        /// The function completed without error
+        Ok = 0,
+
+        /// An invalid parameter was passed (e.g. a null pointer or an invalid track number)
+        BadParam = -1,
+
+        /// `libwebm` returned an error, and no more specific error info is known. No assumptions
+        /// should be made about whether this is an issue with the caller, or something internal
+        /// to `libwebm`.
+        UnknownLibwebmError = -2,
+    }
 
     // audio
     pub const OPUS_CODEC_ID: u32 = 0;
@@ -33,21 +48,6 @@ pub mod mux {
     pub type SegmentMutPtr = *mut Segment;
     pub type SegmentNonNullPtr = NonNull<Segment>;
 
-    #[repr(C)]
-    pub struct Track {
-        _opaque_c_aligned: *mut c_void,
-    }
-    pub type TrackMutPtr = *mut Track;
-    pub type TrackNonNullPtr = NonNull<Track>;
-
-    #[repr(C)]
-    pub struct VideoTrack(Track);
-    pub type VideoTrackMutPtr = *mut VideoTrack;
-
-    #[repr(C)]
-    pub struct AudioTrack(Track);
-    pub type AudioTrackMutPtr = *mut AudioTrack;
-
     #[link(name = "webmadapter", kind = "static")]
     extern "C" {
         #[link_name = "mux_new_writer"]
@@ -64,7 +64,8 @@ pub mod mux {
         #[link_name = "mux_new_segment"]
         pub fn new_segment() -> SegmentMutPtr;
         #[link_name = "mux_initialize_segment"]
-        pub fn initialize_segment(segment: SegmentMutPtr, writer: WriterMutPtr) -> bool;
+        pub fn initialize_segment(segment: SegmentMutPtr, writer: WriterMutPtr) -> ResultCode;
+        #[link_name = "mux_set_color"]
         pub fn mux_set_color(
             segment: SegmentMutPtr,
             video_track_num: TrackNum,
@@ -72,10 +73,11 @@ pub mod mux {
             sampling_horiz: c_int,
             sampling_vert: c_int,
             full_range: c_int,
-        ) -> c_int;
+        ) -> ResultCode;
+        #[link_name = "mux_set_writing_app"]
         pub fn mux_set_writing_app(segment: SegmentMutPtr, name: *const c_char);
         #[link_name = "mux_finalize_segment"]
-        pub fn finalize_segment(segment: SegmentMutPtr, duration: u64) -> bool;
+        pub fn finalize_segment(segment: SegmentMutPtr, duration: u64) -> ResultCode;
         #[link_name = "mux_delete_segment"]
         pub fn delete_segment(segment: SegmentMutPtr);
 
@@ -87,7 +89,7 @@ pub mod mux {
             number: i32,
             codec_id: u32,
             track_num_out: *mut TrackNum,
-        ) -> VideoTrackMutPtr;
+        ) -> ResultCode;
         #[link_name = "mux_segment_add_audio_track"]
         pub fn segment_add_audio_track(
             segment: SegmentMutPtr,
@@ -96,7 +98,7 @@ pub mod mux {
             number: i32,
             codec_id: u32,
             track_num_out: *mut TrackNum,
-        ) -> AudioTrackMutPtr;
+        ) -> ResultCode;
         #[link_name = "mux_segment_add_frame"]
         pub fn segment_add_frame(
             segment: SegmentMutPtr,
@@ -105,14 +107,14 @@ pub mod mux {
             length: usize,
             timestamp_ns: u64,
             keyframe: bool,
-        ) -> bool;
+        ) -> ResultCode;
         #[link_name = "mux_segment_set_codec_private"]
         pub fn segment_set_codec_private(
             segment: SegmentMutPtr,
-            number: TrackNum,
+            track_num: TrackNum,
             data: *const u8,
             len: i32,
-        ) -> bool;
+        ) -> ResultCode;
     }
 }
 
