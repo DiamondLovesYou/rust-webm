@@ -13,29 +13,11 @@ pub mod mux {
 
     use std::ptr::NonNull;
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq, Eq)]
     pub struct VideoTrack(TrackNum);
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq, Eq)]
     pub struct AudioTrack(TrackNum);
-
-    impl Eq for VideoTrack {}
-    impl PartialEq for VideoTrack {
-        fn eq(&self, track: &VideoTrack) -> bool {
-            self.0 == track.0
-        }
-    }
-
-    impl Eq for AudioTrack {}
-    impl PartialEq for AudioTrack {
-        fn eq(&self, track: &AudioTrack) -> bool {
-            self.0 == track.0
-        }
-    }
-
-    unsafe impl Send for VideoTrack {}
-
-    unsafe impl Send for AudioTrack {}
 
     pub trait Track {
         fn is_audio(&self) -> bool {
@@ -151,13 +133,21 @@ pub mod mux {
             }
         }
 
+        /// Adds a new video track to this segment, returning its track number.
+        ///
+        /// You may request a specific track number using the `track_num` parameter. If one is specified, and this method
+        /// succeeds, the returned track number is guaranteed to match the requested one. If a track with that number
+        /// already exists, however, this method will fail. Leave as `None` to allow an available number to be chosen for
+        /// you.
+        ///
+        /// This method will fail if called after the first frame has been written.
         pub fn add_video_track(
             &mut self,
             width: u32,
             height: u32,
-            id: Option<i32>,
+            desired_track_num: Option<i32>,
             codec: VideoCodecId,
-        ) -> VideoTrack {
+        ) -> Result<VideoTrack, Error> {
             let mut track_num_out: TrackNum = 0;
             let ffi = self.segment_ptr();
             let result = unsafe {
@@ -165,39 +155,16 @@ pub mod mux {
                     ffi.as_ptr(),
                     width as i32,
                     height as i32,
-                    id.unwrap_or(0),
+                    desired_track_num.unwrap_or(0),
                     codec.get_id(),
                     &mut track_num_out,
                 )
             };
-            assert_eq!(result, ResultCode::Ok);
-            VideoTrack(track_num_out)
-        }
 
-        pub fn add_video_track_opt(
-            &mut self,
-            width: u32,
-            height: u32,
-            id: Option<i32>,
-            codec: VideoCodecId,
-        ) -> Option<VideoTrack> {
-            let mut track_num_out: TrackNum = 0;
-            let ffi = self.segment_ptr();
-            let result = unsafe {
-                ffi::mux::segment_add_video_track(
-                    ffi.as_ptr(),
-                    width as i32,
-                    height as i32,
-                    id.unwrap_or(0),
-                    codec.get_id(),
-                    &mut track_num_out,
-                )
-            };
-            if result != ResultCode::Ok {
-                return None;
+            match result {
+                ResultCode::Ok => Ok(VideoTrack(track_num_out)),
+                _ => Err(Error::Unknown),
             }
-
-            Some(VideoTrack(track_num_out))
         }
 
         pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> bool {
@@ -213,13 +180,21 @@ pub mod mux {
             }
         }
 
+        /// Adds a new audio track to this segment, returning its track number.
+        ///
+        /// You may request a specific track number using the `track_num` parameter. If one is specified, and this method
+        /// succeeds, the returned track number is guaranteed to match the requested one. If a track with that number
+        /// already exists, however, this method will fail. Leave as `None` to allow an available number to be chosen for
+        /// you.
+        ///
+        /// This method will fail if called after the first frame has been written.
         pub fn add_audio_track(
             &mut self,
             sample_rate: i32,
             channels: i32,
-            id: Option<i32>,
+            desired_track_num: Option<i32>,
             codec: AudioCodecId,
-        ) -> AudioTrack {
+        ) -> Result<AudioTrack, Error> {
             let mut track_num_out: TrackNum = 0;
             let ffi = self.segment_ptr();
             let result = unsafe {
@@ -227,37 +202,16 @@ pub mod mux {
                     ffi.as_ptr(),
                     sample_rate,
                     channels,
-                    id.unwrap_or(0),
+                    desired_track_num.unwrap_or(0),
                     codec.get_id(),
                     &mut track_num_out,
                 )
             };
-            assert_eq!(result, ResultCode::Ok);
-            AudioTrack(track_num_out)
-        }
-        pub fn add_audio_track_opt(
-            &mut self,
-            sample_rate: i32,
-            channels: i32,
-            id: Option<i32>,
-            codec: AudioCodecId,
-        ) -> Option<AudioTrack> {
-            let mut track_num_out: TrackNum = 0;
-            let ffi = self.segment_ptr();
-            let result = unsafe {
-                ffi::mux::segment_add_audio_track(
-                    ffi.as_ptr(),
-                    sample_rate,
-                    channels,
-                    id.unwrap_or(0),
-                    codec.get_id(),
-                    &mut track_num_out,
-                )
-            };
-            if result != ResultCode::Ok {
-                return None;
+
+            match result {
+                ResultCode::Ok => Ok(AudioTrack(track_num_out)),
+                _ => Err(Error::Unknown),
             }
-            Some(AudioTrack(track_num_out))
         }
 
         /// Sets color information for the specified video track.
@@ -326,7 +280,16 @@ pub mod mux {
             }
         }
 
-        pub fn try_finalize(mut self, duration: Option<u64>) -> Result<W, W> {
+        /// Finalizes the segment and consumes it, returning the underlying writer. Note that the finalizing process will
+        /// itself trigger writes (such as to write seeking information).
+        ///
+        /// The resulting WebM may not be playable if you drop the [`Segment`] without calling this first!
+        ///
+        /// You may specify an explicit `duration` to be written to the segment's `Duration` element. However, this requires
+        /// seeking and thus will be ignored if the writer was not created with [`Seek`](std::io::Seek) support.
+        ///
+        /// Finalization is known to fail if no frames have been written.
+        pub fn finalize(mut self, duration: Option<u64>) -> Result<W, W> {
             let result = unsafe {
                 let ffi = self.segment_ptr();
                 ffi::mux::finalize_segment(ffi.as_ptr(), duration.unwrap_or(0))
@@ -342,11 +305,6 @@ pub mod mux {
             } else {
                 Err(writer)
             }
-        }
-
-        /// After calling, all tracks are freed (ie you can't use them).
-        pub fn finalize(self, duration: Option<u64>) -> bool {
-            self.try_finalize(duration).is_ok()
         }
     }
 
@@ -371,8 +329,7 @@ mod tests {
         let mut output = Vec::with_capacity(4_000_000); // 4 MB
         let writer = mux::Writer::new(Cursor::new(&mut output));
         let mut segment = mux::Segment::new(writer).expect("Segment should create OK");
-        let video_track =
-            segment.add_video_track_opt(420, 420, Some(123456), mux::VideoCodecId::VP8);
-        assert!(video_track.is_none());
+        let video_track = segment.add_video_track(420, 420, Some(123456), mux::VideoCodecId::VP8);
+        assert!(video_track.is_err());
     }
 }
