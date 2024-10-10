@@ -1,159 +1,17 @@
 extern crate webm_sys as ffi;
 
 pub mod mux {
-    use ffi::mux::{TrackNum, WriterGetPosFn, WriterSetPosFn};
+    mod writer;
+
+    pub use writer::Writer;
+
+    use ffi::mux::TrackNum;
+    use writer::MkvWriter;
 
     use crate::ffi;
-    use std::os::raw::c_void;
 
-    use std::io::{Seek, Write};
-    use std::pin::Pin;
     use std::ptr::NonNull;
     use std::sync::{Arc, Mutex, MutexGuard, Weak};
-
-    /// Structure for writing a muxed WebM stream to the user-supplied write destination `T`.
-    ///
-    /// `T` may be a file, an `std::io::Cursor` over a byte array, or anything implementing the [`Write`] trait.
-    /// It is recommended, but not required, that `T` also implement [`Seek`]. This allows the resulting WebM
-    /// file to have things like seeking headers and a stream duration known upfront.
-    ///
-    /// Once this [`Writer`] is created, you can use it to create one or more [`Segment`]s.
-    pub struct Writer<T>
-    where
-        T: Write,
-    {
-        writer_data: Pin<Box<MuxWriterData<T>>>,
-        mkv_writer: ffi::mux::WriterNonNullPtr,
-    }
-
-    unsafe impl<T: Send + Write> Send for Writer<T> {}
-
-    struct MuxWriterData<T> {
-        dest: T,
-
-        /// Used for tracking position when using a non-Seek write destination
-        bytes_written: u64,
-    }
-
-    impl<T> Writer<T>
-    where
-        T: Write,
-    {
-        /// Creates a [`Writer`] for a destination that does not support [`Seek`].
-        /// If it does support [`Seek`], you should use [`Writer::new()`] instead.
-        pub fn new_non_seek(dest: T) -> Writer<T> {
-            extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64 {
-                // The user-supplied writer does not track its own position.
-                // Use our own based on how much has been written
-                let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
-                data.bytes_written
-            }
-
-            Self::make_writer(dest, get_pos_fn::<T>, None)
-        }
-
-        /// Consumes this [`Writer`], and returns the user-supplied write destination
-        /// that it was created with.
-        #[must_use]
-        pub fn unwrap(self) -> T {
-            unsafe {
-                ffi::mux::delete_writer(self.mkv_writer.as_ptr());
-                Pin::into_inner_unchecked(self.writer_data).dest
-            }
-        }
-
-        fn make_writer(
-            dest: T,
-            get_pos_fn: WriterGetPosFn,
-            set_pos_fn: Option<WriterSetPosFn>,
-        ) -> Self {
-            extern "C" fn write_fn<T>(data: *mut c_void, buf: *const c_void, len: usize) -> bool
-            where
-                T: Write,
-            {
-                if buf.is_null() {
-                    return false;
-                }
-                let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
-                let buf = unsafe { std::slice::from_raw_parts(buf.cast::<u8>(), len) };
-
-                let result = data.dest.write(buf);
-                if let Ok(num_bytes) = result {
-                    // Guard against a future universe where sizeof(usize) > sizeof(u64)
-                    let num_bytes_u64: u64 = num_bytes.try_into().unwrap();
-
-                    data.bytes_written += num_bytes_u64;
-
-                    // Partial writes are considered failure
-                    num_bytes == len
-                } else {
-                    false
-                }
-            }
-
-            let mut writer_data = Box::pin(MuxWriterData {
-                dest,
-                bytes_written: 0,
-            });
-            let mkv_writer = unsafe {
-                ffi::mux::new_writer(
-                    Some(write_fn::<T>),
-                    Some(get_pos_fn),
-                    set_pos_fn,
-                    None,
-                    (writer_data.as_mut().get_unchecked_mut() as *mut MuxWriterData<T>).cast(),
-                )
-            };
-            assert!(!mkv_writer.is_null());
-
-            Writer {
-                writer_data,
-                mkv_writer: NonNull::new(mkv_writer).unwrap(),
-            }
-        }
-    }
-
-    impl<T> Writer<T>
-    where
-        T: Write + Seek,
-    {
-        /// Creates a [`Writer`] for a destination that supports [`Seek`].
-        /// If it does not support [`Seek`], you should use [`Writer::new_non_seek()`] instead.
-        pub fn new(dest: T) -> Writer<T> {
-            use std::io::SeekFrom;
-
-            extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64
-            where
-                T: Write + Seek,
-            {
-                let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
-                data.dest.stream_position().unwrap()
-            }
-            extern "C" fn set_pos_fn<T>(data: *mut c_void, pos: u64) -> bool
-            where
-                T: Write + Seek,
-            {
-                let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
-                data.dest.seek(SeekFrom::Start(pos)).is_ok()
-            }
-
-            Self::make_writer(dest, get_pos_fn::<T>, Some(set_pos_fn::<T>))
-        }
-    }
-
-    #[doc(hidden)]
-    pub trait MkvWriter {
-        fn mkv_writer(&self) -> ffi::mux::WriterMutPtr;
-    }
-
-    impl<T> MkvWriter for Writer<T>
-    where
-        T: Write,
-    {
-        fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
-            self.mkv_writer.as_ptr()
-        }
-    }
 
     #[derive(Clone)]
     /// Clone only increments reference count, it's still one track
