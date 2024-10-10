@@ -13,11 +13,23 @@ pub mod mux {
 
     use std::ptr::NonNull;
 
-    #[derive(Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct VideoTrack(TrackNum);
 
-    #[derive(Clone, PartialEq, Eq)]
+    impl From<VideoTrack> for TrackNum {
+        fn from(track: VideoTrack) -> Self {
+            track.0
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct AudioTrack(TrackNum);
+
+    impl From<AudioTrack> for TrackNum {
+        fn from(track: AudioTrack) -> Self {
+            track.0
+        }
+    }
 
     pub trait Track {
         fn is_audio(&self) -> bool {
@@ -47,7 +59,7 @@ pub mod mux {
             true
         }
 
-        #[doc(hidden)]
+        #[must_use]
         fn track_number(&self) -> TrackNum {
             self.0
         }
@@ -219,7 +231,7 @@ pub mod mux {
         /// This method will fail if called after the first frame has been written.
         pub fn set_color(
             &mut self,
-            track: &VideoTrack,
+            track: VideoTrack,
             bit_depth: u8,
             subsampling: (bool, bool),
             full_range: bool,
@@ -236,7 +248,7 @@ pub mod mux {
             let result = unsafe {
                 ffi::mux::mux_set_color(
                     self.ffi.unwrap().as_ptr(),
-                    track.track_number(),
+                    track.into(),
                     bit_depth.into(),
                     to_int(sampling_horiz),
                     to_int(sampling_vert),
@@ -251,14 +263,14 @@ pub mod mux {
         }
 
         /// Adds a frame to the track with the specified track number. If you have a [`VideoTrack`] or
-        /// [`AudioTrack`], you can call `track_number()` to get the underlying [`TrackNum`].
+        /// [`AudioTrack`], you can either pass it directly, or call `track_number()` to get the underlying [`TrackNum`].
         ///
         /// The timestamp must be in nanosecond units, and must be monotonically increasing with respect to all other
         /// timestamps written so far, including those of other tracks! Repeating the last written timestamp is allowed,
         /// however players generally don't handle this well if both such frames are on the same track.
         pub fn add_frame(
             &mut self,
-            track_num: TrackNum,
+            track: impl Into<TrackNum>,
             data: &[u8],
             timestamp_ns: u64,
             keyframe: bool,
@@ -266,7 +278,7 @@ pub mod mux {
             let result = unsafe {
                 ffi::mux::segment_add_frame(
                     self.ffi.unwrap().as_ptr(),
-                    track_num,
+                    track.into(),
                     data.as_ptr(),
                     data.len(),
                     timestamp_ns,
