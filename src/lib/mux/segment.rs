@@ -4,39 +4,88 @@ use ffi::mux::{ResultCode, TrackNum};
 
 use super::{writer::MkvWriter, AudioCodecId, AudioTrack, Error, VideoCodecId, VideoTrack};
 
-pub struct Segment<W> {
-    ffi: Option<ffi::mux::SegmentNonNullPtr>,
-    writer: Option<W>,
+/// RAII semantics for an FFI segment. This is simpler than implementing `Drop` on [`Segment`], which
+/// prevents destructuring.
+struct OwnedSegmentPtr {
+    segment: ffi::mux::SegmentNonNullPtr,
 }
 
+impl OwnedSegmentPtr {
+    /// ## Safety
+    /// `segment` must be a valid, non-dangling pointer to an FFI segment created with [`ffi::mux::new_segment`].
+    /// After construction, `segment` must not be used by the caller, except via [`Self::as_ptr`].
+    /// The latter also must not be passed to [`ffi::mux::delete_segment`].
+    unsafe fn new(segment: ffi::mux::SegmentNonNullPtr) -> Self {
+        Self { segment }
+    }
+
+    fn as_ptr(&self) -> ffi::mux::SegmentMutPtr {
+        self.segment.as_ptr()
+    }
+}
+
+impl Drop for OwnedSegmentPtr {
+    fn drop(&mut self) {
+        // SAFETY: We are assumed to be the only one allowed to delete this segment (per the requirements of [`Self::new`]).
+        unsafe {
+            ffi::mux::delete_segment(self.segment.as_ptr());
+        }
+    }
+}
+
+/// A Matroska segment. This is where tracks are created and frames are written.
+///
+/// In typical usage, you first create a [`Writer`](crate::mux::Writer), use that to create a single segment, and go
+/// from there.
+///
+/// ## Finalization
+/// Once you are done writing frames to this segment, you must call [`Segment::finalize`] on it.
+/// This performs a few final writes, and the resulting WebM may not be playable without it.
+/// Notably, for memory safety reasons, just dropping a [`Segment`] will not finalize it!
+pub struct Segment<W> {
+    ffi: OwnedSegmentPtr,
+    writer: W,
+}
+
+// SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
+// Thus, safety is only conditional on the write destination `W`, hence the `Send` bound on it.
+//
+// `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
+unsafe impl<W: Send> Send for Segment<W> {}
+
 impl<W> Segment<W> {
-    /// Note: the supplied writer must have a lifetime larger than the segment.
-    pub fn new(dest: W) -> Option<Self>
+    /// Creates a new Matroska segment that writes WebM data to `dest`.
+    /// This `dest` parameter typically is a [`Writer`](crate::mux::Writer).
+    pub fn new(dest: W) -> Result<Self, Error>
     where
         W: MkvWriter,
     {
         let ffi = unsafe { ffi::mux::new_segment() };
-        let ffi = NonNull::new(ffi)?;
+        let ffi = NonNull::new(ffi).ok_or(Error::Unknown)?;
         let result = unsafe { ffi::mux::initialize_segment(ffi.as_ptr(), dest.mkv_writer()) };
-        if result != ResultCode::Ok {
-            return None;
+
+        match result {
+            ResultCode::Ok => {
+                let ffi = unsafe { OwnedSegmentPtr::new(ffi) };
+                Ok(Segment { ffi, writer: dest })
+            }
+            _ => {
+                unsafe {
+                    ffi::mux::delete_segment(ffi.as_ptr());
+                }
+                Err(Error::Unknown)
+            }
         }
-
-        Some(Segment {
-            ffi: Some(ffi),
-            writer: Some(dest),
-        })
     }
 
-    fn segment_ptr(&self) -> ffi::mux::SegmentNonNullPtr {
-        *self.ffi.as_ref().unwrap()
-    }
-
+    /// Sets the name of the muxing application. This will become the `MuxingApp` element of the resulting
+    /// WebM.
+    ///
+    /// Calling this after the first frame has been written has no effect.
     pub fn set_app_name(&mut self, name: &str) {
         let name = std::ffi::CString::new(name).unwrap();
-        let ffi = self.segment_ptr();
         unsafe {
-            ffi::mux::mux_set_writing_app(ffi.as_ptr(), name.as_ptr());
+            ffi::mux::mux_set_writing_app(self.ffi.as_ptr(), name.as_ptr());
         }
     }
 
@@ -56,10 +105,9 @@ impl<W> Segment<W> {
         codec: VideoCodecId,
     ) -> Result<VideoTrack, Error> {
         let mut track_num_out: TrackNum = 0;
-        let ffi = self.segment_ptr();
         let result = unsafe {
             ffi::mux::segment_add_video_track(
-                ffi.as_ptr(),
+                self.ffi.as_ptr(),
                 width as i32,
                 height as i32,
                 desired_track_num.unwrap_or(0),
@@ -69,21 +117,15 @@ impl<W> Segment<W> {
         };
 
         match result {
-            ResultCode::Ok => Ok(VideoTrack(track_num_out)),
-            _ => Err(Error::Unknown),
-        }
-    }
+            ResultCode::Ok => {
+                // If a specific track number was requested, make sure we got it
+                if let Some(desired) = desired_track_num {
+                    assert_eq!(desired as TrackNum, track_num_out);
+                }
 
-    pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> bool {
-        let ffi = self.segment_ptr();
-        unsafe {
-            let result = ffi::mux::segment_set_codec_private(
-                ffi.as_ptr(),
-                track_number,
-                data.as_ptr(),
-                data.len().try_into().unwrap(),
-            );
-            result == ResultCode::Ok
+                Ok(VideoTrack(track_num_out))
+            }
+            _ => Err(Error::Unknown),
         }
     }
 
@@ -103,10 +145,9 @@ impl<W> Segment<W> {
         codec: AudioCodecId,
     ) -> Result<AudioTrack, Error> {
         let mut track_num_out: TrackNum = 0;
-        let ffi = self.segment_ptr();
         let result = unsafe {
             ffi::mux::segment_add_audio_track(
-                ffi.as_ptr(),
+                self.ffi.as_ptr(),
                 sample_rate,
                 channels,
                 desired_track_num.unwrap_or(0),
@@ -116,8 +157,35 @@ impl<W> Segment<W> {
         };
 
         match result {
-            ResultCode::Ok => Ok(AudioTrack(track_num_out)),
+            ResultCode::Ok => {
+                // If a specific track number was requested, make sure we got it
+                if let Some(desired) = desired_track_num {
+                    assert_eq!(desired as TrackNum, track_num_out);
+                }
+
+                Ok(AudioTrack(track_num_out))
+            }
             _ => Err(Error::Unknown),
+        }
+    }
+
+    /// Sets the CodecPrivate data a frame to the track with the specified track number. If you have a
+    /// [`VideoTrackNum`] or [`AudioTrackNum`], you can call `as_track_number()` to get the underlying [`TrackNum`].
+    ///
+    /// This method will fail if called after the first frame has been written.
+    pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> Result<(), Error> {
+        unsafe {
+            let result = ffi::mux::segment_set_codec_private(
+                self.ffi.as_ptr(),
+                track_number,
+                data.as_ptr(),
+                data.len().try_into().unwrap(),
+            );
+
+            match result {
+                ResultCode::Ok => Ok(()),
+                _ => Err(Error::Unknown),
+            }
         }
     }
 
@@ -142,7 +210,7 @@ impl<W> Segment<W> {
 
         let result = unsafe {
             ffi::mux::mux_set_color(
-                self.ffi.unwrap().as_ptr(),
+                self.ffi.as_ptr(),
                 track.into(),
                 bit_depth.into(),
                 to_int(sampling_horiz),
@@ -172,7 +240,7 @@ impl<W> Segment<W> {
     ) -> Result<(), Error> {
         let result = unsafe {
             ffi::mux::segment_add_frame(
-                self.ffi.unwrap().as_ptr(),
+                self.ffi.as_ptr(),
                 track.into(),
                 data.as_ptr(),
                 data.len(),
@@ -196,31 +264,30 @@ impl<W> Segment<W> {
     /// seeking and thus will be ignored if the writer was not created with [`Seek`](std::io::Seek) support.
     ///
     /// Finalization is known to fail if no frames have been written.
-    pub fn finalize(mut self, duration: Option<u64>) -> Result<W, W> {
-        let result = unsafe {
-            let ffi = self.segment_ptr();
-            ffi::mux::finalize_segment(ffi.as_ptr(), duration.unwrap_or(0))
-        };
-        let segment = self.ffi.take().unwrap();
-        unsafe {
-            ffi::mux::delete_segment(segment.as_ptr());
-        }
-        let writer = self.writer.take().unwrap();
+    pub fn finalize(self, duration: Option<u64>) -> Result<W, W> {
+        let Self { ffi, writer } = self;
+        let result = unsafe { ffi::mux::finalize_segment(ffi.as_ptr(), duration.unwrap_or(0)) };
 
-        if result == ResultCode::Ok {
-            Ok(writer)
-        } else {
-            Err(writer)
+        match result {
+            ResultCode::Ok => Ok(writer),
+            _ => Err(writer),
         }
     }
 }
 
-impl<W> Drop for Segment<W> {
-    fn drop(&mut self) {
-        if let Some(segment) = self.ffi.take() {
-            unsafe {
-                ffi::mux::delete_segment(segment.as_ptr());
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use crate::mux::Writer;
+
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn bad_track_number() {
+        let mut output = Vec::with_capacity(4_000_000); // 4 MB
+        let writer = Writer::new(Cursor::new(&mut output));
+        let mut segment = Segment::new(writer).expect("Segment should create OK");
+        let video_track = segment.add_video_track(420, 420, Some(123456), VideoCodecId::VP8);
+        assert!(video_track.is_err());
     }
 }
