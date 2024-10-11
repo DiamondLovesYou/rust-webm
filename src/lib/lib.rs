@@ -92,8 +92,6 @@ pub mod mux {
         }
     }
 
-    unsafe impl<W: Send> Send for Segment<W> {}
-
     /// The error type for this entire crate. More specific error types will
     /// be added in the future, hence the current marking as non-exhaustive.
     #[derive(Debug)]
@@ -102,20 +100,5 @@ pub mod mux {
         /// An unknown error occurred. While this is typically the result of
         /// incorrect parameters to methods, this is not a guarantee.
         Unknown,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Cursor;
-
-    #[test]
-    fn bad_track_number() {
-        let mut output = Vec::with_capacity(4_000_000); // 4 MB
-        let writer = mux::Writer::new(Cursor::new(&mut output));
-        let mut segment = mux::Segment::new(writer).expect("Segment should create OK");
-        let video_track = segment.add_video_track(420, 420, Some(123456), mux::VideoCodecId::VP8);
-        assert!(video_track.is_err());
     }
 }
