@@ -82,7 +82,7 @@ where
     /// Consumes this [`Writer`], and returns the user-supplied write destination
     /// that it was created with.
     #[must_use]
-    pub fn unwrap(self) -> T {
+    pub fn into_inner(self) -> T {
         let Self { writer_data, .. } = self;
         unsafe { Pin::into_inner_unchecked(writer_data).dest }
     }
