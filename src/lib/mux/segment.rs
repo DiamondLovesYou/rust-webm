@@ -284,10 +284,26 @@ mod tests {
 
     #[test]
     fn bad_track_number() {
-        let mut output = Vec::with_capacity(4_000_000); // 4 MB
+        let mut output = Vec::new();
         let writer = Writer::new(Cursor::new(&mut output));
         let mut segment = Segment::new(writer).expect("Segment should create OK");
         let video_track = segment.add_video_track(420, 420, Some(123456), VideoCodecId::VP8);
         assert!(video_track.is_err());
+    }
+
+    #[test]
+    fn overlapping_track_number() {
+        let mut output = Vec::new();
+        let writer = Writer::new(Cursor::new(&mut output));
+        let mut segment = Segment::new(writer).expect("Segment should create OK");
+
+        let video_track = segment.add_video_track(420, 420, Some(123), VideoCodecId::VP8);
+        assert!(video_track.is_ok());
+
+        let video_track2 = segment.add_video_track(420, 420, Some(123), VideoCodecId::VP8);
+        assert!(video_track2.is_err());
+
+        let audio_track = segment.add_audio_track(420, 420, Some(123), AudioCodecId::Opus);
+        assert!(audio_track.is_err());
     }
 }
