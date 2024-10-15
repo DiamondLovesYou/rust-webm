@@ -97,16 +97,31 @@ impl<W: Write> Segment<W> {
         &mut self,
         width: u32,
         height: u32,
-        desired_track_num: Option<i32>,
+        desired_track_num: Option<TrackNum>,
         codec: VideoCodecId,
     ) -> Result<VideoTrack, Error> {
         let mut track_num_out: TrackNum = 0;
+
+        // Zero is not a valid track number, and to libwebm means "choose one for me".
+        // If this is the user's intent, they should instead pass `None`.
+        if desired_track_num == Some(0) {
+            return Err(Error::BadParam);
+        }
+
+        // libwebm requires i32 for these
+        let width: i32 = try_as_i32(width)?;
+        let height: i32 = try_as_i32(height)?;
+        if width == 0 || height == 0 {
+            return Err(Error::BadParam);
+        }
+        let requested_track_num: i32 = try_as_i32(desired_track_num.unwrap_or(0))?;
+
         let result = unsafe {
             ffi::mux::segment_add_video_track(
                 self.ffi.as_ptr(),
-                width as i32,
-                height as i32,
-                desired_track_num.unwrap_or(0),
+                width,
+                height,
+                requested_track_num,
                 codec.get_id(),
                 &mut track_num_out,
             )
@@ -116,7 +131,7 @@ impl<W: Write> Segment<W> {
             ResultCode::Ok => {
                 // If a specific track number was requested, make sure we got it
                 if let Some(desired) = desired_track_num {
-                    assert_eq!(desired as TrackNum, track_num_out);
+                    assert_eq!(desired, track_num_out);
                 }
 
                 Ok(VideoTrack(track_num_out))
@@ -135,18 +150,33 @@ impl<W: Write> Segment<W> {
     /// This method will fail if called after the first frame has been written.
     pub fn add_audio_track(
         &mut self,
-        sample_rate: i32,
-        channels: i32,
-        desired_track_num: Option<i32>,
+        sample_rate: u32,
+        channels: u32,
+        desired_track_num: Option<TrackNum>,
         codec: AudioCodecId,
     ) -> Result<AudioTrack, Error> {
         let mut track_num_out: TrackNum = 0;
+
+        // Zero is not a valid track number, and to libwebm means "choose one for me".
+        // If this is the user's intent, they should instead pass `None`.
+        if desired_track_num == Some(0) {
+            return Err(Error::BadParam);
+        }
+
+        // libwebm requires i32 for these
+        let sample_rate: i32 = try_as_i32(sample_rate)?;
+        let channels: i32 = try_as_i32(channels)?;
+        if sample_rate == 0 || channels == 0 {
+            return Err(Error::BadParam);
+        }
+        let requested_track_num: i32 = try_as_i32(desired_track_num.unwrap_or(0))?;
+
         let result = unsafe {
             ffi::mux::segment_add_audio_track(
                 self.ffi.as_ptr(),
                 sample_rate,
                 channels,
-                desired_track_num.unwrap_or(0),
+                requested_track_num,
                 codec.get_id(),
                 &mut track_num_out,
             )
@@ -156,7 +186,7 @@ impl<W: Write> Segment<W> {
             ResultCode::Ok => {
                 // If a specific track number was requested, make sure we got it
                 if let Some(desired) = desired_track_num {
-                    assert_eq!(desired as TrackNum, track_num_out);
+                    assert_eq!(desired, track_num_out);
                 }
 
                 Ok(AudioTrack(track_num_out))
@@ -269,6 +299,10 @@ impl<W: Write> Segment<W> {
             _ => Err(writer),
         }
     }
+}
+
+fn try_as_i32(x: impl TryInto<i32>) -> Result<i32, Error> {
+    x.try_into().map_err(|_| Error::BadParam)
 }
 
 #[cfg(test)]
