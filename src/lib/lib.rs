@@ -125,8 +125,12 @@ pub mod mux {
     #[derive(Debug)]
     #[non_exhaustive]
     pub enum Error {
+        /// An parameter with an invalid value was passed to a method.
+        BadParam,
+
         /// An unknown error occurred. While this is typically the result of
-        /// incorrect parameters to methods, this is not a guarantee.
+        /// incorrect parameters to methods, an internal error in libwebm is
+        /// also possible.
         Unknown,
     }
 }
