@@ -87,6 +87,10 @@ where
         unsafe { Pin::into_inner_unchecked(writer_data).dest }
     }
 
+    pub(crate) fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
+        self.mkv_writer.as_ptr()
+    }
+
     fn make_writer(
         dest: T,
         get_pos_fn: WriterGetPosFn,
@@ -163,29 +167,5 @@ where
         }
 
         Self::make_writer(dest, get_pos_fn::<T>, Some(set_pos_fn::<T>))
-    }
-}
-
-/// The trait used by [`Segment`] to actually write out WebM data. This is implemented
-/// by [`Writer`], which in most cases is what you actually want to use.
-///
-/// ## Safety
-/// See the documentation for [`MkvWriter::mkv_writer`].
-pub unsafe trait MkvWriter {
-    /// Return the writer that should be passed to `libwebm` when initializing the segment.
-    ///
-    /// ## Safety
-    /// The returned pointer must be non-null and remain valid for the lifetime of the [`Segment`].
-    fn mkv_writer(&self) -> ffi::mux::WriterMutPtr;
-}
-
-// SAFETY: This is only destroyed when the [`Writer`] is, which due to [`Segment::new`](crate::mux::Segment::new)
-// taking ownership of the [`Writer`], always outlives that segment.
-unsafe impl<T> MkvWriter for Writer<T>
-where
-    T: Write,
-{
-    fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
-        self.mkv_writer.as_ptr()
     }
 }

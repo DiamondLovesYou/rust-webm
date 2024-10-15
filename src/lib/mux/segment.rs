@@ -1,8 +1,8 @@
-use std::ptr::NonNull;
+use std::{io::Write, ptr::NonNull};
 
 use ffi::mux::{ResultCode, TrackNum};
 
-use super::{writer::MkvWriter, AudioCodecId, AudioTrack, Error, VideoCodecId, VideoTrack};
+use super::{writer::Writer, AudioCodecId, AudioTrack, Error, VideoCodecId, VideoTrack};
 
 /// RAII semantics for an FFI segment. This is simpler than implementing `Drop` on [`Segment`], which
 /// prevents destructuring.
@@ -42,24 +42,20 @@ impl Drop for OwnedSegmentPtr {
 /// Once you are done writing frames to this segment, you must call [`Segment::finalize`] on it.
 /// This performs a few final writes, and the resulting WebM may not be playable without it.
 /// Notably, for memory safety reasons, just dropping a [`Segment`] will not finalize it!
-pub struct Segment<W> {
+pub struct Segment<W: Write> {
     ffi: OwnedSegmentPtr,
-    writer: W,
+    writer: Writer<W>,
 }
 
 // SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
 // Thus, safety is only conditional on the write destination `W`, hence the `Send` bound on it.
 //
 // `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
-unsafe impl<W: Send> Send for Segment<W> {}
+unsafe impl<W: Write + Send> Send for Segment<W> {}
 
-impl<W> Segment<W> {
+impl<W: Write> Segment<W> {
     /// Creates a new Matroska segment that writes WebM data to `dest`.
-    /// This `dest` parameter typically is a [`Writer`](crate::mux::Writer).
-    pub fn new(dest: W) -> Result<Self, Error>
-    where
-        W: MkvWriter,
-    {
+    pub fn new(dest: Writer<W>) -> Result<Self, Error> {
         let ffi = unsafe { ffi::mux::new_segment() };
         let ffi = NonNull::new(ffi).ok_or(Error::Unknown)?;
         let result = unsafe { ffi::mux::initialize_segment(ffi.as_ptr(), dest.mkv_writer()) };
@@ -264,7 +260,7 @@ impl<W> Segment<W> {
     /// seeking and thus will be ignored if the writer was not created with [`Seek`](std::io::Seek) support.
     ///
     /// Finalization is known to fail if no frames have been written.
-    pub fn finalize(self, duration: Option<u64>) -> Result<W, W> {
+    pub fn finalize(self, duration: Option<u64>) -> Result<Writer<W>, Writer<W>> {
         let Self { ffi, writer } = self;
         let result = unsafe { ffi::mux::finalize_segment(ffi.as_ptr(), duration.unwrap_or(0)) };
 
