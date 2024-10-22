@@ -36,73 +36,53 @@ impl Drop for OwnedSegmentPtr {
     }
 }
 
-/// A Matroska segment. This is where tracks are created and frames are written.
+/// A builder for [`Segment`].
 ///
-/// In typical usage, you first create a [`Writer`](crate::mux::Writer), use that to create a single segment, and go
-/// from there.
-///
-/// ## Finalization
-/// Once you are done writing frames to this segment, you must call [`Segment::finalize`] on it.
-/// This performs a few final writes, and the resulting WebM may not be playable without it.
-/// Notably, for memory safety reasons, just dropping a [`Segment`] will not finalize it!
-pub struct Segment<W: Write> {
-    ffi: OwnedSegmentPtr,
+/// Once you have a [`Writer`], you can use this to specify the tracks and track parameters you want, then build a
+/// [`Segment`], allowing you to write frames.
+pub struct SegmentBuilder<W: Write> {
+    segment: OwnedSegmentPtr,
     writer: Writer<W>,
 }
 
-// SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
-// Thus, safety is only conditional on the write destination `W`, hence the `Send` bound on it.
-//
-// `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
-unsafe impl<W: Write + Send> Send for Segment<W> {}
-
-impl<W: Write> Segment<W> {
-    /// Creates a new Matroska segment that writes WebM data to `dest`.
-    pub fn new(dest: Writer<W>) -> Result<Self, Error> {
-        let ffi = unsafe { ffi::mux::new_segment() };
-        let ffi = NonNull::new(ffi).ok_or(Error::Unknown)?;
-        let result = unsafe { ffi::mux::initialize_segment(ffi.as_ptr(), dest.mkv_writer()) };
+impl<W: Write> SegmentBuilder<W> {
+    /// Creates a new [`SegmentBuilder`] with default configuration, that writes to the specified [`Writer`].
+    pub fn new(writer: Writer<W>) -> Result<Self, Error> {
+        let segment = unsafe { ffi::mux::new_segment() };
+        let segment = NonNull::new(segment)
+            .map(|ptr| unsafe { OwnedSegmentPtr::new(ptr) })
+            .ok_or(Error::Unknown)?;
+        let result = unsafe { ffi::mux::initialize_segment(segment.as_ptr(), writer.mkv_writer()) };
 
         match result {
-            ResultCode::Ok => {
-                let ffi = unsafe { OwnedSegmentPtr::new(ffi) };
-                Ok(Segment { ffi, writer: dest })
-            }
-            _ => {
-                unsafe {
-                    ffi::mux::delete_segment(ffi.as_ptr());
-                }
-                Err(Error::Unknown)
-            }
+            ResultCode::Ok => Ok(SegmentBuilder { segment, writer }),
+            _ => Err(Error::Unknown),
         }
     }
 
-    /// Sets the name of the muxing application. This will become the `MuxingApp` element of the resulting
-    /// WebM.
-    ///
-    /// Calling this after the first frame has been written has no effect.
-    pub fn set_app_name(&mut self, name: &str) {
-        let name = std::ffi::CString::new(name).unwrap();
+    /// Sets the name of the writing application. This will show up under the `WritingApp` Matroska element.
+    pub fn set_writing_app(self, app_name: &str) -> Result<Self, Error> {
+        let name = std::ffi::CString::new(app_name).map_err(|_| Error::BadParam)?;
         unsafe {
-            ffi::mux::mux_set_writing_app(self.ffi.as_ptr(), name.as_ptr());
+            ffi::mux::mux_set_writing_app(self.segment.as_ptr(), name.as_ptr());
         }
+
+        Ok(self)
     }
 
     /// Adds a new video track to this segment, returning its track number.
     ///
-    /// You may request a specific track number using the `track_num` parameter. If one is specified, and this method
-    /// succeeds, the returned track number is guaranteed to match the requested one. If a track with that number
-    /// already exists, however, this method will fail. Leave as `None` to allow an available number to be chosen for
-    /// you.
-    ///
-    /// This method will fail if called after the first frame has been written.
+    /// You may request a specific track number using the `desired_track_num` parameter. If one is specified, and this
+    /// method succeeds, the returned track number is guaranteed to match the requested one. If a track with that
+    /// number already exists, however, this method will fail. Leave as `None` to allow an available number to be
+    /// chosen for you.
     pub fn add_video_track(
-        &mut self,
+        self,
         width: u32,
         height: u32,
-        desired_track_num: Option<TrackNum>,
         codec: VideoCodecId,
-    ) -> Result<VideoTrack, Error> {
+        desired_track_num: Option<TrackNum>,
+    ) -> Result<(Self, VideoTrack), Error> {
         let mut track_num_out: TrackNum = 0;
 
         // Zero is not a valid track number, and to libwebm means "choose one for me".
@@ -121,7 +101,7 @@ impl<W: Write> Segment<W> {
 
         let result = unsafe {
             ffi::mux::segment_add_video_track(
-                self.ffi.as_ptr(),
+                self.segment.as_ptr(),
                 width,
                 height,
                 requested_track_num,
@@ -137,7 +117,7 @@ impl<W: Write> Segment<W> {
                     assert_eq!(desired, track_num_out);
                 }
 
-                Ok(VideoTrack(track_num_out))
+                Ok((self, VideoTrack(track_num_out)))
             }
             _ => Err(Error::Unknown),
         }
@@ -145,19 +125,17 @@ impl<W: Write> Segment<W> {
 
     /// Adds a new audio track to this segment, returning its track number.
     ///
-    /// You may request a specific track number using the `track_num` parameter. If one is specified, and this method
-    /// succeeds, the returned track number is guaranteed to match the requested one. If a track with that number
-    /// already exists, however, this method will fail. Leave as `None` to allow an available number to be chosen for
-    /// you.
-    ///
-    /// This method will fail if called after the first frame has been written.
+    /// You may request a specific track number using the `desired_track_num` parameter. If one is specified, and this
+    /// method succeeds, the returned track number is guaranteed to match the requested one. If a track with that
+    /// number already exists, however, this method will fail. Leave as `None` to allow an available number to be
+    /// chosen for you.
     pub fn add_audio_track(
-        &mut self,
+        self,
         sample_rate: u32,
         channels: u32,
-        desired_track_num: Option<TrackNum>,
         codec: AudioCodecId,
-    ) -> Result<AudioTrack, Error> {
+        desired_track_num: Option<TrackNum>,
+    ) -> Result<(Self, AudioTrack), Error> {
         let mut track_num_out: TrackNum = 0;
 
         // Zero is not a valid track number, and to libwebm means "choose one for me".
@@ -176,7 +154,7 @@ impl<W: Write> Segment<W> {
 
         let result = unsafe {
             ffi::mux::segment_add_audio_track(
-                self.ffi.as_ptr(),
+                self.segment.as_ptr(),
                 sample_rate,
                 channels,
                 requested_track_num,
@@ -192,46 +170,39 @@ impl<W: Write> Segment<W> {
                     assert_eq!(desired, track_num_out);
                 }
 
-                Ok(AudioTrack(track_num_out))
+                Ok((self, AudioTrack(track_num_out)))
             }
             _ => Err(Error::Unknown),
         }
     }
 
-    /// Sets the CodecPrivate data a frame to the specified track. If you have a [`VideoTrack`] or [`AudioTrack`], you
+    /// Sets the CodecPrivate data for the specified track. If you have a [`VideoTrack`] or [`AudioTrack`], you
     /// can either pass it directly, or call `track_number()` to get the underlying [`TrackNum`].
-    ///
-    /// This method will fail if called after the first frame has been written.
-    pub fn set_codec_private(
-        &mut self,
-        track: impl Into<TrackNum>,
-        data: &[u8],
-    ) -> Result<(), Error> {
+    pub fn set_codec_private(self, track: impl Into<TrackNum>, data: &[u8]) -> Result<Self, Error> {
         unsafe {
+            let len: i32 = data.len().try_into().map_err(|_| Error::BadParam)?;
             let result = ffi::mux::segment_set_codec_private(
-                self.ffi.as_ptr(),
+                self.segment.as_ptr(),
                 track.into(),
                 data.as_ptr(),
-                data.len().try_into().unwrap(),
+                len,
             );
 
             match result {
-                ResultCode::Ok => Ok(()),
+                ResultCode::Ok => Ok(self),
                 _ => Err(Error::Unknown),
             }
         }
     }
 
     /// Sets color information for the specified video track.
-    ///
-    /// This method will fail if called after the first frame has been written.
     pub fn set_color(
-        &mut self,
+        self,
         track: VideoTrack,
         bit_depth: u8,
         subsampling: ColorSubsampling,
         color_range: ColorRange,
-    ) -> Result<(), Error> {
+    ) -> Result<Self, Error> {
         let color_range = match color_range {
             ColorRange::Unspecified => 0,
             ColorRange::Broadcast => 1,
@@ -240,7 +211,7 @@ impl<W: Write> Segment<W> {
 
         let result = unsafe {
             ffi::mux::mux_set_color(
-                self.ffi.as_ptr(),
+                self.segment.as_ptr(),
                 track.into(),
                 bit_depth.into(),
                 subsampling.chroma_horizontal,
@@ -250,11 +221,50 @@ impl<W: Write> Segment<W> {
         };
 
         match result {
-            ResultCode::Ok => Ok(()),
+            ResultCode::Ok => Ok(self),
             _ => Err(Error::Unknown),
         }
     }
 
+    /// Finalizes track information and makes the segment ready to accept video/audio frames.
+    pub fn build(self) -> Segment<W> {
+        let Self { segment, writer } = self;
+        Segment {
+            ffi: segment,
+            writer,
+        }
+    }
+}
+
+impl<W: Write> std::fmt::Debug for SegmentBuilder<W> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // We can't/shouldn't crawl into our FFI pointers for debug printing, and we don't require `W: Debug`, but we
+        // should still have even a primitive Debug impl to avoid friction with user structs that #[derive(Debug)]
+        f.write_str(std::any::type_name::<Self>())
+    }
+}
+
+/// A fully-built Matroska segment. This is where actual video/audio frames are written.
+///
+/// This is created via [`SegmentBuilder`]. Once built in this way, the list of tracks and their parameters become
+/// immutable.
+///
+/// ## Finalization
+/// Once you are done writing frames to this segment, you must call [`Segment::finalize`] on it.
+/// This performs a few final writes, and the resulting WebM may not be playable without it.
+/// Notably, for memory safety reasons, just dropping a [`Segment`] will not finalize it!
+pub struct Segment<W: Write> {
+    ffi: OwnedSegmentPtr,
+    writer: Writer<W>,
+}
+
+// SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
+// Thus, safety is only conditional on the write destination `W`, hence the `Send` bound on it.
+//
+// `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
+unsafe impl<W: Write + Send> Send for Segment<W> {}
+
+impl<W: Write> Segment<W> {
     /// Adds a frame to the track with the specified track number. If you have a [`VideoTrack`] or
     /// [`AudioTrack`], you can either pass it directly, or call `track_number()` to get the underlying [`TrackNum`].
     ///
@@ -305,6 +315,14 @@ impl<W: Write> Segment<W> {
     }
 }
 
+impl<W: Write> std::fmt::Debug for Segment<W> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // We can't/shouldn't crawl into our FFI pointers for debug printing, and we don't require `W: Debug`, but we
+        // should still have even a primitive Debug impl to avoid friction with user structs that #[derive(Debug)]
+        f.write_str(std::any::type_name::<Self>())
+    }
+}
+
 fn try_as_i32(x: impl TryInto<i32>) -> Result<i32, Error> {
     x.try_into().map_err(|_| Error::BadParam)
 }
@@ -316,28 +334,42 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
+    fn make_segment_builder() -> SegmentBuilder<Cursor<Vec<u8>>> {
+        let output = Vec::new();
+        let writer = Writer::new(Cursor::new(output));
+        SegmentBuilder::new(writer).expect("Segment builder should create OK")
+    }
+
     #[test]
     fn bad_track_number() {
-        let mut output = Vec::new();
-        let writer = Writer::new(Cursor::new(&mut output));
-        let mut segment = Segment::new(writer).expect("Segment should create OK");
-        let video_track = segment.add_video_track(420, 420, Some(123456), VideoCodecId::VP8);
+        let builder = make_segment_builder();
+        let video_track = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(123456));
         assert!(video_track.is_err());
     }
 
     #[test]
-    fn overlapping_track_number() {
-        let mut output = Vec::new();
-        let writer = Writer::new(Cursor::new(&mut output));
-        let mut segment = Segment::new(writer).expect("Segment should create OK");
+    fn overlapping_track_number_same_type() {
+        let builder = make_segment_builder();
 
-        let video_track = segment.add_video_track(420, 420, Some(123), VideoCodecId::VP8);
-        assert!(video_track.is_ok());
+        let Ok((builder, _)) = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(123))
+        else {
+            panic!("First video track unexpectedly failed")
+        };
 
-        let video_track2 = segment.add_video_track(420, 420, Some(123), VideoCodecId::VP8);
+        let video_track2 = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(123));
         assert!(video_track2.is_err());
+    }
 
-        let audio_track = segment.add_audio_track(420, 420, Some(123), AudioCodecId::Opus);
+    #[test]
+    fn overlapping_track_number_different_type() {
+        let builder = make_segment_builder();
+
+        let Ok((builder, _)) = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(123))
+        else {
+            panic!("First video track unexpectedly failed")
+        };
+
+        let audio_track = builder.add_audio_track(420, 420, AudioCodecId::Opus, Some(123));
         assert!(audio_track.is_err());
     }
 }

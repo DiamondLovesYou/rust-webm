@@ -5,21 +5,27 @@
 //!
 //! Actual writing of muxed data is done through a [`mux::Writer`], which lets you supply your own implementation.
 //! This makes it easy to support muxing to files, in-memory buffers, or whatever else you need. Once you have
-//! a [`mux::Writer`], you can create a [`mux::Segment`] to which you can add tracks and media frames.
+//! a [`mux::Writer`], you create a [`mux::SegmentBuilder`] and add the tracks you need. Finally, you create a
+//! [`mux::Segment`] with that builder, to which you can add media frames.
 //!
 //! In typical usage of this library, where you might mux to a WebM file, you would do:
 //! ```no_run
 //! use std::fs::File;
-//! use webm::mux::{Segment, VideoCodecId, Writer};
+//! use webm::mux::{SegmentBuilder, VideoCodecId, Writer};
 //!
 //! let file = File::open("./my-cool-file.webm").unwrap();
 //! let writer = Writer::new(file);
-//! let mut segment = Segment::new(writer).unwrap();
 //!
-//! // Add some video data
-//! let video_track = segment.add_video_track(640, 480, None, VideoCodecId::VP8).unwrap();
+//! // Build a segment with a single video track
+//! let builder = SegmentBuilder::new(writer).unwrap();
+//! let (builder, video_track) = builder.add_video_track(640, 480, VideoCodecId::VP8, None).unwrap();
+//! let mut segment = builder.build();
+//!
+//! // Add some video frames
 //! let encoded_video_frame: &[u8] = &[]; // TODO: Your video data here
-//! segment.add_frame(video_track, encoded_video_frame, 0, true).unwrap();
+//! let timestamp_ns = 0;
+//! let is_keyframe = true;
+//! segment.add_frame(video_track, encoded_video_frame, timestamp_ns, is_keyframe).unwrap();
 //! // TODO: More video frames
 //!
 //! // Done writing frames, finish off the file
@@ -32,7 +38,11 @@ pub mod mux {
     mod segment;
     mod writer;
 
-    pub use {ffi::mux::TrackNum, segment::Segment, writer::Writer};
+    pub use {
+        ffi::mux::TrackNum,
+        segment::{Segment, SegmentBuilder},
+        writer::Writer,
+    };
 
     use crate::ffi;
 
