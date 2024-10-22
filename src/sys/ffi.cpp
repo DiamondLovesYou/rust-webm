@@ -178,7 +178,7 @@ extern "C" {
     return ResultCode::Ok;
   }
 
-  ResultCode mux_set_color(MuxSegmentPtr segment, TrackNum video_track_num, int bits, int sampling_horiz, int sampling_vert, int full_range) {
+  ResultCode mux_set_color(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t bits, uint64_t sampling_horiz, uint64_t sampling_vert, uint64_t color_range) {
     mkvmuxer::Colour color;
 
     MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
@@ -189,7 +189,7 @@ extern "C" {
     color.set_chroma_subsampling_horz(sampling_horiz);
     color.set_chroma_subsampling_vert(sampling_vert);
 
-    color.set_range(full_range ? mkvmuxer::Colour::kFullRange : mkvmuxer::Colour::kBroadcastRange);
+    color.set_range(color_range);
     bool success = video->SetColour(color);
 
     return success ? ResultCode::Ok : ResultCode::UnknownLibwebmError;
