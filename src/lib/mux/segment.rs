@@ -2,7 +2,10 @@ use std::{io::Write, ptr::NonNull};
 
 use ffi::mux::{ResultCode, TrackNum};
 
-use super::{writer::Writer, AudioCodecId, AudioTrack, Error, VideoCodecId, VideoTrack};
+use super::{
+    writer::Writer, AudioCodecId, AudioTrack, ColorRange, ColorSubsampling, Error, VideoCodecId,
+    VideoTrack,
+};
 
 /// RAII semantics for an FFI segment. This is simpler than implementing `Drop` on [`Segment`], which
 /// prevents destructuring.
@@ -195,15 +198,19 @@ impl<W: Write> Segment<W> {
         }
     }
 
-    /// Sets the CodecPrivate data a frame to the track with the specified track number. If you have a
-    /// [`VideoTrackNum`] or [`AudioTrackNum`], you can call `as_track_number()` to get the underlying [`TrackNum`].
+    /// Sets the CodecPrivate data a frame to the specified track. If you have a [`VideoTrack`] or [`AudioTrack`], you
+    /// can either pass it directly, or call `track_number()` to get the underlying [`TrackNum`].
     ///
     /// This method will fail if called after the first frame has been written.
-    pub fn set_codec_private(&mut self, track_number: u64, data: &[u8]) -> Result<(), Error> {
+    pub fn set_codec_private(
+        &mut self,
+        track: impl Into<TrackNum>,
+        data: &[u8],
+    ) -> Result<(), Error> {
         unsafe {
             let result = ffi::mux::segment_set_codec_private(
                 self.ffi.as_ptr(),
-                track_number,
+                track.into(),
                 data.as_ptr(),
                 data.len().try_into().unwrap(),
             );
@@ -222,26 +229,23 @@ impl<W: Write> Segment<W> {
         &mut self,
         track: VideoTrack,
         bit_depth: u8,
-        subsampling: (bool, bool),
-        full_range: bool,
+        subsampling: ColorSubsampling,
+        color_range: ColorRange,
     ) -> Result<(), Error> {
-        let (sampling_horiz, sampling_vert) = subsampling;
-        fn to_int(b: bool) -> i32 {
-            if b {
-                1
-            } else {
-                0
-            }
-        }
+        let color_range = match color_range {
+            ColorRange::Unspecified => 0,
+            ColorRange::Broadcast => 1,
+            ColorRange::Full => 2,
+        };
 
         let result = unsafe {
             ffi::mux::mux_set_color(
                 self.ffi.as_ptr(),
                 track.into(),
                 bit_depth.into(),
-                to_int(sampling_horiz),
-                to_int(sampling_vert),
-                to_int(full_range),
+                subsampling.chroma_horizontal,
+                subsampling.chroma_vertical,
+                color_range,
             )
         };
 

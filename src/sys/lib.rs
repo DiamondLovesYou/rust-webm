@@ -1,5 +1,5 @@
 pub mod mux {
-    use core::ffi::{c_char, c_int, c_void};
+    use core::ffi::{c_char, c_void};
     use core::ptr::NonNull;
 
     #[repr(C)]
@@ -69,10 +69,10 @@ pub mod mux {
         pub fn mux_set_color(
             segment: SegmentMutPtr,
             video_track_num: TrackNum,
-            bits: c_int,
-            sampling_horiz: c_int,
-            sampling_vert: c_int,
-            full_range: c_int,
+            bits: u64,
+            sampling_horiz: u64,
+            sampling_vert: u64,
+            color_range: u64,
         ) -> ResultCode;
         #[link_name = "mux_set_writing_app"]
         pub fn mux_set_writing_app(segment: SegmentMutPtr, name: *const c_char);

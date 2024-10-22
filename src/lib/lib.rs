@@ -133,4 +133,43 @@ pub mod mux {
         /// also possible.
         Unknown,
     }
+
+    /// A specification for how pixels in written video frames are subsampled in chroma channels.
+    ///
+    /// Certain video frame formats (e.g. YUV 4:2:0) have a lower resolution in chroma (Cr/Cb) channels than the
+    /// luminance channel. This structure informs video players how that subsampling is done, using a number of
+    /// subsampling factors. A factor of zero means no subsampling, and a factor of one means that particular dimension
+    /// is half resolution.
+    ///
+    /// You may use [`ColorSubsampling::default()`] to get a specification of no subsampling in any dimension.
+    #[derive(Default, Debug, Clone, PartialEq, Eq)]
+    pub struct ColorSubsampling {
+        /// The subsampling factor for both chroma channels in the horizontal direction.
+        pub chroma_horizontal: u64,
+
+        /// The subsampling factor for both chroma channels in the vertical direction.
+        pub chroma_vertical: u64,
+    }
+
+    /// A specification of how the range of colors in the input video frames has been clipped.
+    ///
+    /// Certain screens struggle with the full range of available colors, and video content is thus sometimes tuned to
+    /// a restricted range.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum ColorRange {
+        /// No claim is made as to how colors have been restricted.
+        Unspecified,
+
+        /// Color values are restricted to a "broadcast-safe" range.
+        Broadcast,
+
+        /// No color clipping is performed.
+        Full,
+    }
+
+    impl Default for ColorRange {
+        fn default() -> Self {
+            Self::Unspecified
+        }
+    }
 }
