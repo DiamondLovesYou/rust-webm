@@ -155,31 +155,26 @@ pub mod mux {
     #[derive(Default, Debug, Clone, PartialEq, Eq)]
     pub struct ColorSubsampling {
         /// The subsampling factor for both chroma channels in the horizontal direction.
-        pub chroma_horizontal: u64,
+        pub chroma_horizontal: u8,
 
         /// The subsampling factor for both chroma channels in the vertical direction.
-        pub chroma_vertical: u64,
+        pub chroma_vertical: u8,
     }
 
     /// A specification of how the range of colors in the input video frames has been clipped.
     ///
     /// Certain screens struggle with the full range of available colors, and video content is thus sometimes tuned to
     /// a restricted range.
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Default)]
     pub enum ColorRange {
         /// No claim is made as to how colors have been restricted.
-        Unspecified,
+        #[default]
+        Unspecified = 0,
 
         /// Color values are restricted to a "broadcast-safe" range.
-        Broadcast,
+        Broadcast = 1,
 
         /// No color clipping is performed.
-        Full,
-    }
-
-    impl Default for ColorRange {
-        fn default() -> Self {
-            Self::Unspecified
-        }
+        Full = 2,
     }
 }

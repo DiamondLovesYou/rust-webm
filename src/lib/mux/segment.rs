@@ -1,6 +1,7 @@
 use std::{io::Write, ptr::NonNull};
 
-use ffi::mux::{ResultCode, TrackNum};
+use crate::ffi;
+use crate::ffi::mux::{ResultCode, TrackNum};
 
 use super::{
     writer::Writer, AudioCodecId, AudioTrack, ColorRange, ColorSubsampling, Error, VideoCodecId,
@@ -213,7 +214,7 @@ impl<W: Write> SegmentBuilder<W> {
             ffi::mux::mux_set_color(
                 self.segment.as_ptr(),
                 track.into(),
-                bit_depth.into(),
+                bit_depth,
                 subsampling.chroma_horizontal,
                 subsampling.chroma_vertical,
                 color_range,

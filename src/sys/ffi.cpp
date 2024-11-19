@@ -178,7 +178,7 @@ extern "C" {
     return ResultCode::Ok;
   }
 
-  ResultCode mux_set_color(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t bits, uint64_t sampling_horiz, uint64_t sampling_vert, uint64_t color_range) {
+  ResultCode mux_set_color(MuxSegmentPtr segment, TrackNum video_track_num, uint8_t bits, uint8_t sampling_horiz, uint8_t sampling_vert, uint8_t color_range) {
     mkvmuxer::Colour color;
 
     MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);

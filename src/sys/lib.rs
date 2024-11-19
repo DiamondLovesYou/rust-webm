@@ -69,10 +69,10 @@ pub mod mux {
         pub fn mux_set_color(
             segment: SegmentMutPtr,
             video_track_num: TrackNum,
-            bits: u64,
-            sampling_horiz: u64,
-            sampling_vert: u64,
-            color_range: u64,
+            bits_per_channel: u8,
+            sampling_horiz: u8,
+            sampling_vert: u8,
+            color_range: u8,
         ) -> ResultCode;
         #[link_name = "mux_set_writing_app"]
         pub fn mux_set_writing_app(segment: SegmentMutPtr, name: *const c_char);
