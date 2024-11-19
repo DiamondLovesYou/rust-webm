@@ -1,5 +1,6 @@
 use std::ffi::c_void;
 use std::io::{Seek, Write};
+use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 
@@ -8,6 +9,11 @@ use crate::ffi::mux::{WriterGetPosFn, WriterSetPosFn};
 
 /// RAII semantics for an FFI writer. This is simpler than implementing `Drop` on [`Writer`], which
 /// prevents destructuring.
+//
+// SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
+// `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
+unsafe impl Send for OwnedWriterPtr {}
+
 struct OwnedWriterPtr {
     writer: ffi::mux::WriterNonNullPtr,
 }
@@ -50,17 +56,12 @@ where
     mkv_writer: OwnedWriterPtr,
 }
 
-// SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
-// Thus, safety is only conditional on the write destination `T`, hence the `Send` bound on it.
-//
-// `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
-unsafe impl<T: Send + Write> Send for Writer<T> {}
-
 struct MuxWriterData<T> {
     dest: T,
 
     /// Used for tracking position when using a non-Seek write destination
     bytes_written: u64,
+    _marker: PhantomPinned,
 }
 
 impl<T> Writer<T>
@@ -82,6 +83,8 @@ where
 
     /// Consumes this [`Writer`], and returns the user-supplied write destination
     /// that it was created with.
+    ///
+    /// It does not flush any unwritten data.
     #[must_use]
     pub fn into_inner(self) -> T {
         let Self { writer_data, .. } = self;
@@ -124,6 +127,7 @@ where
         let mut writer_data = Box::pin(MuxWriterData {
             dest,
             bytes_written: 0,
+            _marker: PhantomPinned,
         });
         let mkv_writer = unsafe {
             ffi::mux::new_writer(
@@ -149,6 +153,8 @@ where
 {
     /// Creates a [`Writer`] for a destination that supports [`Seek`].
     /// If it does not support [`Seek`], you should use [`Writer::new_non_seek()`] instead.
+    ///
+    /// You can use `io::Cursor::new(Vec::new())` for in-memory writing, or `BufReader::new(File)`.
     pub fn new(dest: T) -> Writer<T> {
         use std::io::SeekFrom;
 
@@ -169,4 +175,17 @@ where
 
         Self::make_writer(dest, get_pos_fn::<T>, Some(set_pos_fn::<T>))
     }
+}
+
+#[test]
+fn sendable() {
+    fn is_send<T: Send>(_: &T) {}
+
+    let w = Writer::new(std::io::Cursor::new(vec![1,2,3]));
+    is_send(&w);
+    assert_eq!([1,2,3], *w.into_inner().into_inner());
+
+    let w = Writer::new_non_seek(vec![3,4,5]);
+    is_send(&w);
+    assert_eq!([3,4,5], *w.into_inner());
 }
