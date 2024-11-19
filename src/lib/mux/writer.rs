@@ -3,7 +3,8 @@ use std::io::{Seek, Write};
 use std::pin::Pin;
 use std::ptr::NonNull;
 
-use ffi::mux::{WriterGetPosFn, WriterSetPosFn};
+use crate::ffi;
+use crate::ffi::mux::{WriterGetPosFn, WriterSetPosFn};
 
 /// RAII semantics for an FFI writer. This is simpler than implementing `Drop` on [`Writer`], which
 /// prevents destructuring.

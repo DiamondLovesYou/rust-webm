@@ -32,7 +32,7 @@
 //! _ = segment.finalize(None).inspect_err(|_| eprintln!("Could not finalize WebM file"));
 //! ```
 
-extern crate webm_sys as ffi;
+use webm_sys as ffi;
 
 pub mod mux {
     mod segment;
@@ -46,6 +46,7 @@ pub mod mux {
 
     use crate::ffi;
 
+    /// This is a copyable handle equivalent to a track number
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct VideoTrack(TrackNum);
 
@@ -55,6 +56,7 @@ pub mod mux {
         }
     }
 
+    /// This is a copyable handle equivalent to a track number
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct AudioTrack(TrackNum);
 
@@ -65,9 +67,12 @@ pub mod mux {
     }
 
     pub trait Track {
+        #[must_use]
         fn is_audio(&self) -> bool {
             false
         }
+
+        #[must_use]
         fn is_video(&self) -> bool {
             false
         }
@@ -77,6 +82,7 @@ pub mod mux {
     }
 
     impl Track for VideoTrack {
+        #[must_use]
         fn is_video(&self) -> bool {
             true
         }
@@ -88,6 +94,7 @@ pub mod mux {
     }
 
     impl Track for AudioTrack {
+        #[must_use]
         fn is_audio(&self) -> bool {
             true
         }
@@ -99,34 +106,29 @@ pub mod mux {
     }
 
     #[derive(Eq, PartialEq, Clone, Copy, Debug)]
+    #[repr(u32)]
     pub enum AudioCodecId {
-        Opus,
-        Vorbis,
+        Opus = ffi::mux::OPUS_CODEC_ID,
+        Vorbis = ffi::mux::VORBIS_CODEC_ID,
     }
 
     impl AudioCodecId {
-        fn get_id(&self) -> u32 {
-            match self {
-                AudioCodecId::Opus => ffi::mux::OPUS_CODEC_ID,
-                AudioCodecId::Vorbis => ffi::mux::VORBIS_CODEC_ID,
-            }
+        fn get_id(self) -> u32 {
+            self as u32
         }
     }
 
     #[derive(Eq, PartialEq, Clone, Copy, Debug)]
+    #[repr(u32)]
     pub enum VideoCodecId {
-        VP8,
-        VP9,
-        AV1,
+        VP8 = ffi::mux::VP8_CODEC_ID,
+        VP9 = ffi::mux::VP9_CODEC_ID,
+        AV1 = ffi::mux::AV1_CODEC_ID,
     }
 
     impl VideoCodecId {
-        fn get_id(&self) -> u32 {
-            match self {
-                VideoCodecId::VP8 => ffi::mux::VP8_CODEC_ID,
-                VideoCodecId::VP9 => ffi::mux::VP9_CODEC_ID,
-                VideoCodecId::AV1 => ffi::mux::AV1_CODEC_ID,
-            }
+        fn get_id(self) -> u32 {
+            self as u32
         }
     }
 
