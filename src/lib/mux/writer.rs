@@ -135,7 +135,7 @@ where
                 Some(get_pos_fn),
                 set_pos_fn,
                 None,
-                (writer_data.as_mut().get_unchecked_mut() as *mut MuxWriterData<T>).cast(),
+                std::ptr::from_mut(writer_data.as_mut().get_unchecked_mut()).cast(),
             )
         };
         assert!(!mkv_writer.is_null());

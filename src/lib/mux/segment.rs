@@ -1,4 +1,6 @@
-use std::{io::Write, ptr::NonNull};
+use std::io::Write;
+use std::num::NonZeroU64;
+use std::ptr::NonNull;
 
 use crate::ffi;
 use crate::ffi::mux::{ResultCode, TrackNum};
@@ -57,6 +59,7 @@ impl<W: Write> SegmentBuilder<W> {
 
         match result {
             ResultCode::Ok => Ok(SegmentBuilder { segment, writer }),
+            ResultCode::BadParam => Err(Error::BadParam),
             _ => Err(Error::Unknown),
         }
     }
@@ -113,13 +116,18 @@ impl<W: Write> SegmentBuilder<W> {
 
         match result {
             ResultCode::Ok => {
+                let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
+
                 // If a specific track number was requested, make sure we got it
                 if let Some(desired) = desired_track_num {
-                    assert_eq!(desired, track_num_out);
+                    if desired != track_num_out.get() {
+                        return Err(Error::Unknown);
+                    }
                 }
 
                 Ok((self, VideoTrack(track_num_out)))
-            }
+            },
+            ResultCode::BadParam => Err(Error::BadParam),
             _ => Err(Error::Unknown),
         }
     }
@@ -166,18 +174,23 @@ impl<W: Write> SegmentBuilder<W> {
 
         match result {
             ResultCode::Ok => {
+                let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
+
                 // If a specific track number was requested, make sure we got it
                 if let Some(desired) = desired_track_num {
-                    assert_eq!(desired, track_num_out);
+                    if desired != track_num_out.get() {
+                        return Err(Error::Unknown);
+                    }
                 }
 
                 Ok((self, AudioTrack(track_num_out)))
-            }
+            },
+            ResultCode::BadParam => Err(Error::BadParam),
             _ => Err(Error::Unknown),
         }
     }
 
-    /// Sets the CodecPrivate data for the specified track. If you have a [`VideoTrack`] or [`AudioTrack`], you
+    /// Sets the `CodecPrivate` data for the specified track. If you have a [`VideoTrack`] or [`AudioTrack`], you
     /// can either pass it directly, or call `track_number()` to get the underlying [`TrackNum`].
     pub fn set_codec_private(self, track: impl Into<TrackNum>, data: &[u8]) -> Result<Self, Error> {
         unsafe {
@@ -191,6 +204,7 @@ impl<W: Write> SegmentBuilder<W> {
 
             match result {
                 ResultCode::Ok => Ok(self),
+                ResultCode::BadParam => Err(Error::BadParam),
                 _ => Err(Error::Unknown),
             }
         }
@@ -223,11 +237,13 @@ impl<W: Write> SegmentBuilder<W> {
 
         match result {
             ResultCode::Ok => Ok(self),
+            ResultCode::BadParam => Err(Error::BadParam),
             _ => Err(Error::Unknown),
         }
     }
 
     /// Finalizes track information and makes the segment ready to accept video/audio frames.
+    #[must_use]
     pub fn build(self) -> Segment<W> {
         let Self { segment, writer } = self;
         Segment {
@@ -292,6 +308,7 @@ impl<W: Write> Segment<W> {
 
         match result {
             ResultCode::Ok => Ok(()),
+            ResultCode::BadParam => Err(Error::BadParam),
             _ => Err(Error::Unknown),
         }
     }

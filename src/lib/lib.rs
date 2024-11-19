@@ -39,30 +39,31 @@ pub mod mux {
     mod writer;
 
     pub use {
-        ffi::mux::TrackNum,
+        crate::ffi::mux::TrackNum,
         segment::{Segment, SegmentBuilder},
         writer::Writer,
     };
 
     use crate::ffi;
+    use std::num::NonZeroU64;
 
     /// This is a copyable handle equivalent to a track number
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct VideoTrack(TrackNum);
+    pub struct VideoTrack(NonZeroU64);
 
     impl From<VideoTrack> for TrackNum {
         fn from(track: VideoTrack) -> Self {
-            track.0
+            track.0.get()
         }
     }
 
     /// This is a copyable handle equivalent to a track number
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct AudioTrack(TrackNum);
+    pub struct AudioTrack(NonZeroU64);
 
     impl From<AudioTrack> for TrackNum {
         fn from(track: AudioTrack) -> Self {
-            track.0
+            track.0.get()
         }
     }
 
@@ -89,7 +90,7 @@ pub mod mux {
 
         #[must_use]
         fn track_number(&self) -> TrackNum {
-            self.0
+            self.0.get()
         }
     }
 
@@ -101,7 +102,7 @@ pub mod mux {
 
         #[must_use]
         fn track_number(&self) -> TrackNum {
-            self.0
+            self.0.get()
         }
     }
 
@@ -154,7 +155,7 @@ pub mod mux {
     /// is half resolution.
     ///
     /// You may use [`ColorSubsampling::default()`] to get a specification of no subsampling in any dimension.
-    #[derive(Default, Debug, Clone, PartialEq, Eq)]
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     pub struct ColorSubsampling {
         /// The subsampling factor for both chroma channels in the horizontal direction.
         pub chroma_horizontal: u8,
@@ -167,7 +168,7 @@ pub mod mux {
     ///
     /// Certain screens struggle with the full range of available colors, and video content is thus sometimes tuned to
     /// a restricted range.
-    #[derive(Debug, Clone, PartialEq, Eq, Default)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
     pub enum ColorRange {
         /// No claim is made as to how colors have been restricted.
         #[default]
