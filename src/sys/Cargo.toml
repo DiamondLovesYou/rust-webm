@@ -2,6 +2,7 @@
 authors = [
     "Kornel Lesiński <kornel@geekhood.net>",
     "Richard Diamond <wichard@vitalitystudios.com>",
+    "Sean Oxley <sean.oxley@bibo.com.ph>",
 ]
 build = "build.rs"
 description = "Rust FFI bindings and wrapper for libwebm"
@@ -21,10 +22,12 @@ include = [
     "libwebm/mkvmuxer/*.h",
     "libwebm/mkvparser/*.cc",
     "libwebm/mkvparser/*.h",
+    "LICENSE.TXT",
+    "PATENTS.TXT",
 ]
 keywords = ["webm", "mkv", "matroska", "vp9"]
 categories = [ "external-ffi-bindings", "multimedia::encoding", "multimedia::video"]
-version = "1.0.7"
+version = "2.0.0-alpha.1"
 edition = "2021"
 
 [build-dependencies]
