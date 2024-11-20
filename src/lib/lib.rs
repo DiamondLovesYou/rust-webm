@@ -147,6 +147,17 @@ pub mod mux {
         Unknown,
     }
 
+    impl std::fmt::Display for Error {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Error::BadParam => f.write_str("Bad parameter"),
+                Error::Unknown => f.write_str("Unknown error"),
+            }
+        }
+    }
+
+    impl std::error::Error for Error {}
+
     /// A specification for how pixels in written video frames are subsampled in chroma channels.
     ///
     /// Certain video frame formats (e.g. YUV 4:2:0) have a lower resolution in chroma (Cr/Cb) channels than the
