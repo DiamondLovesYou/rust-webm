@@ -50,6 +50,7 @@ pub struct SegmentBuilder<W: Write> {
 
 impl<W: Write> SegmentBuilder<W> {
     /// Creates a new [`SegmentBuilder`] with default configuration, that writes to the specified [`Writer`].
+    #[inline]
     pub fn new(writer: Writer<W>) -> Result<Self, Error> {
         let segment = unsafe { ffi::mux::new_segment() };
         let segment = NonNull::new(segment)
@@ -65,6 +66,7 @@ impl<W: Write> SegmentBuilder<W> {
     }
 
     /// Sets the name of the writing application. This will show up under the `WritingApp` Matroska element.
+    #[inline]
     pub fn set_writing_app(self, app_name: &str) -> Result<Self, Error> {
         let name = std::ffi::CString::new(app_name).map_err(|_| Error::BadParam)?;
         unsafe {
@@ -192,6 +194,7 @@ impl<W: Write> SegmentBuilder<W> {
 
     /// Sets the `CodecPrivate` data for the specified track. If you have a [`VideoTrack`] or [`AudioTrack`], you
     /// can either pass it directly, or call `track_number()` to get the underlying [`TrackNum`].
+    #[inline]
     pub fn set_codec_private(self, track: impl Into<TrackNum>, data: &[u8]) -> Result<Self, Error> {
         unsafe {
             let len: i32 = data.len().try_into().map_err(|_| Error::BadParam)?;
@@ -211,6 +214,7 @@ impl<W: Write> SegmentBuilder<W> {
     }
 
     /// Sets color information for the specified video track.
+    #[inline]
     pub fn set_color(
         self,
         track: VideoTrack,
@@ -244,6 +248,7 @@ impl<W: Write> SegmentBuilder<W> {
 
     /// Finalizes track information and makes the segment ready to accept video/audio frames.
     #[must_use]
+    #[inline]
     pub fn build(self) -> Segment<W> {
         let Self { segment, writer } = self;
         Segment {
@@ -254,6 +259,7 @@ impl<W: Write> SegmentBuilder<W> {
 }
 
 impl<W: Write> std::fmt::Debug for SegmentBuilder<W> {
+    #[cold]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // We can't/shouldn't crawl into our FFI pointers for debug printing, and we don't require `W: Debug`, but we
         // should still have even a primitive Debug impl to avoid friction with user structs that #[derive(Debug)]
@@ -288,6 +294,7 @@ impl<W: Write> Segment<W> {
     /// The timestamp must be in nanosecond units, and must be monotonically increasing with respect to all other
     /// timestamps written so far, including those of other tracks! Repeating the last written timestamp is allowed,
     /// however players generally don't handle this well if both such frames are on the same track.
+    #[inline]
     pub fn add_frame(
         &mut self,
         track: impl Into<TrackNum>,
@@ -322,6 +329,7 @@ impl<W: Write> Segment<W> {
     /// seeking and thus will be ignored if the writer was not created with [`Seek`](std::io::Seek) support.
     ///
     /// Finalization is known to fail if no frames have been written.
+    #[inline]
     pub fn finalize(self, duration: Option<u64>) -> Result<Writer<W>, Writer<W>> {
         let Self { ffi, writer } = self;
         let result = unsafe { ffi::mux::finalize_segment(ffi.as_ptr(), duration.unwrap_or(0)) };
@@ -334,6 +342,7 @@ impl<W: Write> Segment<W> {
 }
 
 impl<W: Write> std::fmt::Debug for Segment<W> {
+    #[cold]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // We can't/shouldn't crawl into our FFI pointers for debug printing, and we don't require `W: Debug`, but we
         // should still have even a primitive Debug impl to avoid friction with user structs that #[derive(Debug)]

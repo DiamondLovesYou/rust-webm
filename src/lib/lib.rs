@@ -52,6 +52,7 @@ pub mod mux {
     pub struct VideoTrack(NonZeroU64);
 
     impl From<VideoTrack> for TrackNum {
+        #[inline]
         fn from(track: VideoTrack) -> Self {
             track.0.get()
         }
@@ -62,6 +63,7 @@ pub mod mux {
     pub struct AudioTrack(NonZeroU64);
 
     impl From<AudioTrack> for TrackNum {
+        #[inline]
         fn from(track: AudioTrack) -> Self {
             track.0.get()
         }
@@ -89,6 +91,7 @@ pub mod mux {
         }
 
         #[must_use]
+        #[inline]
         fn track_number(&self) -> TrackNum {
             self.0.get()
         }
@@ -101,6 +104,7 @@ pub mod mux {
         }
 
         #[must_use]
+        #[inline]
         fn track_number(&self) -> TrackNum {
             self.0.get()
         }

@@ -70,6 +70,7 @@ where
 {
     /// Creates a [`Writer`] for a destination that does not support [`Seek`].
     /// If it does support [`Seek`], you should use [`Writer::new()`] instead.
+    #[inline]
     pub fn new_non_seek(dest: T) -> Writer<T> {
         extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64 {
             // The user-supplied writer does not track its own position.
@@ -86,6 +87,7 @@ where
     ///
     /// It does not flush any unwritten data.
     #[must_use]
+    #[inline]
     pub fn into_inner(self) -> T {
         let Self { writer_data, .. } = self;
         unsafe { Pin::into_inner_unchecked(writer_data).dest }
@@ -155,6 +157,7 @@ where
     /// If it does not support [`Seek`], you should use [`Writer::new_non_seek()`] instead.
     ///
     /// You can use `io::Cursor::new(Vec::new())` for in-memory writing, or `BufReader::new(File)`.
+    #[inline]
     pub fn new(dest: T) -> Writer<T> {
         use std::io::SeekFrom;
 
