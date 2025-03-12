@@ -85,12 +85,11 @@ pub mod mux {
     }
 
     impl Track for VideoTrack {
-        #[must_use]
+        #[inline]
         fn is_video(&self) -> bool {
             true
         }
 
-        #[must_use]
         #[inline]
         fn track_number(&self) -> TrackNum {
             self.0.get()
@@ -98,12 +97,11 @@ pub mod mux {
     }
 
     impl Track for AudioTrack {
-        #[must_use]
+        #[inline]
         fn is_audio(&self) -> bool {
             true
         }
 
-        #[must_use]
         #[inline]
         fn track_number(&self) -> TrackNum {
             self.0.get()
@@ -118,7 +116,7 @@ pub mod mux {
     }
 
     impl AudioCodecId {
-        fn get_id(self) -> u32 {
+        const fn get_id(self) -> u32 {
             self as u32
         }
     }
@@ -132,7 +130,7 @@ pub mod mux {
     }
 
     impl VideoCodecId {
-        fn get_id(self) -> u32 {
+        const fn get_id(self) -> u32 {
             self as u32
         }
     }
@@ -154,8 +152,8 @@ pub mod mux {
     impl std::fmt::Display for Error {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                Error::BadParam => f.write_str("Bad parameter"),
-                Error::Unknown => f.write_str("Unknown error"),
+                Self::BadParam => f.write_str("Bad parameter"),
+                Self::Unknown => f.write_str("Unknown error"),
             }
         }
     }

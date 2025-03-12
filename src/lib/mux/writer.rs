@@ -23,11 +23,11 @@ impl OwnedWriterPtr {
     /// `writer` must be a valid, non-dangling pointer to an FFI writer created with [`ffi::mux::new_writer`].
     /// After construction, `writer` must not be used by the caller, except via [`Self::as_ptr`].
     /// The latter also must not be passed to [`ffi::mux::delete_writer`].
-    unsafe fn new(writer: ffi::mux::WriterNonNullPtr) -> Self {
+    const unsafe fn new(writer: ffi::mux::WriterNonNullPtr) -> Self {
         Self { writer }
     }
 
-    fn as_ptr(&self) -> ffi::mux::WriterMutPtr {
+    const fn as_ptr(&self) -> ffi::mux::WriterMutPtr {
         self.writer.as_ptr()
     }
 }
@@ -71,7 +71,7 @@ where
     /// Creates a [`Writer`] for a destination that does not support [`Seek`].
     /// If it does support [`Seek`], you should use [`Writer::new()`] instead.
     #[inline]
-    pub fn new_non_seek(dest: T) -> Writer<T> {
+    pub fn new_non_seek(dest: T) -> Self {
         extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64 {
             // The user-supplied writer does not track its own position.
             // Use our own based on how much has been written
@@ -93,7 +93,7 @@ where
         unsafe { Pin::into_inner_unchecked(writer_data).dest }
     }
 
-    pub(crate) fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
+    pub(crate) const fn mkv_writer(&self) -> ffi::mux::WriterMutPtr {
         self.mkv_writer.as_ptr()
     }
 
@@ -142,7 +142,7 @@ where
         };
         assert!(!mkv_writer.is_null());
 
-        Writer {
+        Self {
             writer_data,
             mkv_writer: unsafe { OwnedWriterPtr::new(NonNull::new(mkv_writer).unwrap()) },
         }
@@ -158,7 +158,7 @@ where
     ///
     /// You can use `io::Cursor::new(Vec::new())` for in-memory writing, or `BufReader::new(File)`.
     #[inline]
-    pub fn new(dest: T) -> Writer<T> {
+    pub fn new(dest: T) -> Self {
         use std::io::SeekFrom;
 
         extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64

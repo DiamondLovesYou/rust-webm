@@ -15,7 +15,7 @@ fn main() {
     c.flag("-std=gnu++11");
     c.flag("-fno-exceptions");
     c.include("libwebm");
-    for &f in files.iter() {
+    for &f in files {
         c.file(f);
     }
     c.compile("libwebmadapter.a");

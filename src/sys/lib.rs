@@ -49,7 +49,7 @@ pub mod mux {
     pub type SegmentNonNullPtr = NonNull<Segment>;
 
     #[link(name = "webmadapter", kind = "static")]
-    extern "C" {
+    unsafe extern "C" {
         #[link_name = "mux_new_writer"]
         pub fn new_writer(
             write: Option<WriterWriteFn>,

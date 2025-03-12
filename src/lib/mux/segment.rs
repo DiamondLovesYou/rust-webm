@@ -21,11 +21,11 @@ impl OwnedSegmentPtr {
     /// `segment` must be a valid, non-dangling pointer to an FFI segment created with [`ffi::mux::new_segment`].
     /// After construction, `segment` must not be used by the caller, except via [`Self::as_ptr`].
     /// The latter also must not be passed to [`ffi::mux::delete_segment`].
-    unsafe fn new(segment: ffi::mux::SegmentNonNullPtr) -> Self {
+    const unsafe fn new(segment: ffi::mux::SegmentNonNullPtr) -> Self {
         Self { segment }
     }
 
-    fn as_ptr(&self) -> ffi::mux::SegmentMutPtr {
+    const fn as_ptr(&self) -> ffi::mux::SegmentMutPtr {
         self.segment.as_ptr()
     }
 }
@@ -59,7 +59,7 @@ impl<W: Write> SegmentBuilder<W> {
         let result = unsafe { ffi::mux::initialize_segment(segment.as_ptr(), writer.mkv_writer()) };
 
         match result {
-            ResultCode::Ok => Ok(SegmentBuilder { segment, writer }),
+            ResultCode::Ok => Ok(Self { segment, writer }),
             ResultCode::BadParam => Err(Error::BadParam),
             _ => Err(Error::Unknown),
         }
