@@ -11,13 +11,14 @@
 //! In typical usage of this library, where you might mux to a WebM file, you would do:
 //! ```no_run
 //! use std::fs::File;
-//! use webm::mux::{SegmentBuilder, VideoCodecId, Writer};
+//! use webm::mux::{SegmentBuilder, SegmentMode, VideoCodecId, Writer};
 //!
 //! let file = File::open("./my-cool-file.webm").unwrap();
 //! let writer = Writer::new(file);
 //!
 //! // Build a segment with a single video track
 //! let builder = SegmentBuilder::new(writer).unwrap();
+//! let builder = builder.set_mode(SegmentMode::Live).unwrap(); // Set live mode for streaming
 //! let (builder, video_track) = builder.add_video_track(640, 480, VideoCodecId::VP8, None).unwrap();
 //! let mut segment = builder.build();
 //!
@@ -192,5 +193,19 @@ pub mod mux {
 
         /// No color clipping is performed.
         Full = 2,
+    }
+
+    /// A specification for the segment writing mode.
+    /// 
+    /// This controls how the segment is written and affects features like seeking.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SegmentMode {
+        /// Live mode - optimized for real-time streaming.
+        /// In this mode, seeking information may not be available.
+        Live,
+        
+        /// File mode - optimized for file-based playback.
+        /// This enables full seeking and duration information.
+        File,
     }
 }

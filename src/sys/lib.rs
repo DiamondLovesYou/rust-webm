@@ -41,6 +41,10 @@ pub mod mux {
     pub const VP9_CODEC_ID: u32 = 1;
     pub const AV1_CODEC_ID: u32 = 2;
 
+    // segment modes
+    pub const SEGMENT_MODE_LIVE: u32 = 0x1;
+    pub const SEGMENT_MODE_FILE: u32 = 0x2;
+
     #[repr(C)]
     pub struct Segment {
         _opaque_c_aligned: *mut c_void,
@@ -80,6 +84,8 @@ pub mod mux {
         pub fn finalize_segment(segment: SegmentMutPtr, duration: u64) -> ResultCode;
         #[link_name = "mux_delete_segment"]
         pub fn delete_segment(segment: SegmentMutPtr);
+        #[link_name = "mux_segment_set_mode"]
+        pub fn segment_set_mode(segment: SegmentMutPtr, mode: u32) -> ResultCode;
 
         #[link_name = "mux_segment_add_video_track"]
         pub fn segment_add_video_track(

@@ -6,7 +6,7 @@ use crate::ffi;
 use crate::ffi::mux::{ResultCode, TrackNum};
 
 use super::{
-    writer::Writer, AudioCodecId, AudioTrack, ColorRange, ColorSubsampling, Error, VideoCodecId,
+    writer::Writer, AudioCodecId, AudioTrack, ColorRange, ColorSubsampling, Error, SegmentMode, VideoCodecId,
     VideoTrack,
 };
 
@@ -74,6 +74,28 @@ impl<W: Write> SegmentBuilder<W> {
         }
 
         Ok(self)
+    }
+
+    /// Sets the segment writing mode.
+    /// 
+    /// - [`SegmentMode::Live`] - Optimized for real-time streaming. Seeking information may not be available.
+    /// - [`SegmentMode::File`] - Optimized for file-based playback. Enables full seeking and duration information.
+    #[inline]
+    pub fn set_mode(self, mode: SegmentMode) -> Result<Self, Error> {
+        let mode_value = match mode {
+            SegmentMode::Live => ffi::mux::SEGMENT_MODE_LIVE,
+            SegmentMode::File => ffi::mux::SEGMENT_MODE_FILE,
+        };
+
+        let result = unsafe {
+            ffi::mux::segment_set_mode(self.segment.as_ptr(), mode_value)
+        };
+
+        match result {
+            ResultCode::Ok => Ok(self),
+            ResultCode::BadParam => Err(Error::BadParam),
+            _ => Err(Error::Unknown),
+        }
     }
 
     /// Adds a new video track to this segment, returning its track number.
@@ -398,5 +420,19 @@ mod tests {
 
         let audio_track = builder.add_audio_track(420, 420, AudioCodecId::Opus, Some(123));
         assert!(audio_track.is_err());
+    }
+
+    #[test]
+    fn set_mode_live() {
+        let builder = make_segment_builder();
+        let result = builder.set_mode(super::SegmentMode::Live);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn set_mode_file() {
+        let builder = make_segment_builder();
+        let result = builder.set_mode(super::SegmentMode::File);
+        assert!(result.is_ok());
     }
 }
