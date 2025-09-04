@@ -127,6 +127,24 @@ extern "C" {
   const uint32_t VP9_CODEC_ID = 1;
   const uint32_t AV1_CODEC_ID = 2;
 
+  // segment modes
+  const uint32_t SEGMENT_MODE_LIVE = static_cast<uint32_t>(mkvmuxer::Segment::kLive);
+  const uint32_t SEGMENT_MODE_FILE = static_cast<uint32_t>(mkvmuxer::Segment::kFile);
+
+  ResultCode mux_segment_set_mode(MuxSegmentPtr segment, uint32_t mode) {
+    if(segment == nullptr) { return ResultCode::BadParam; }
+    
+    mkvmuxer::Segment::Mode segment_mode;
+    switch(mode) {
+    case SEGMENT_MODE_LIVE: segment_mode = mkvmuxer::Segment::kLive; break;
+    case SEGMENT_MODE_FILE: segment_mode = mkvmuxer::Segment::kFile; break;
+    default: return ResultCode::BadParam;
+    }
+    
+    segment->set_mode(segment_mode);
+    return ResultCode::Ok;
+  }
+
   ResultCode mux_segment_set_codec_private(MuxSegmentPtr segment, TrackNum track_num, const uint8_t *data, int len) {
     MuxTrackPtr track = segment->GetTrackByNumber(track_num);
     if (!track) { return ResultCode::BadParam; }
