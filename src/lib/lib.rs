@@ -39,11 +39,9 @@ pub mod mux {
     mod segment;
     mod writer;
 
-    pub use {
-        crate::ffi::mux::TrackNum,
-        segment::{Segment, SegmentBuilder},
-        writer::Writer,
-    };
+    pub use crate::ffi::mux::TrackNum;
+    pub use segment::{Segment, SegmentBuilder};
+    pub use writer::Writer;
 
     use crate::ffi;
     use std::num::NonZeroU64;
@@ -148,6 +146,16 @@ pub mod mux {
         /// incorrect parameters to methods, an internal error in libwebm is
         /// also possible.
         Unknown,
+    }
+
+    impl Error {
+        pub(crate) fn check_code(code: ffi::mux::ResultCode) -> Result<(), Self> {
+            match code {
+                ffi::mux::ResultCode::Ok => Ok(()),
+                ffi::mux::ResultCode::BadParam => Err(Self::BadParam),
+                ffi::mux::ResultCode::UnknownLibwebmError => Err(Self::Unknown),
+            }
+        }
     }
 
     impl std::fmt::Display for Error {

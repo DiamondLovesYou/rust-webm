@@ -59,11 +59,8 @@ impl<W: Write> SegmentBuilder<W> {
             .ok_or(Error::Unknown)?;
         let result = unsafe { ffi::mux::initialize_segment(segment.as_ptr(), writer.mkv_writer()) };
 
-        match result {
-            ResultCode::Ok => Ok(Self { segment, writer }),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)?;
+        Ok(Self { segment, writer })
     }
 
     /// Sets the name of the writing application. This will show up under the `WritingApp` Matroska element.
@@ -89,12 +86,8 @@ impl<W: Write> SegmentBuilder<W> {
         };
 
         let result = unsafe { ffi::mux::segment_set_mode(self.segment.as_ptr(), mode_value) };
-
-        match result {
-            ResultCode::Ok => Ok(self),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)?;
+        Ok(self)
     }
 
     /// Adds a new video track to this segment, returning its track number.
@@ -136,22 +129,17 @@ impl<W: Write> SegmentBuilder<W> {
                 &raw mut track_num_out,
             )
         };
+        Error::check_code(result)?;
 
-        match result {
-            ResultCode::Ok => {
-                let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
+        let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
 
-                // If a specific track number was requested, make sure we got it
-                if let Some(desired) = desired_track_num
-                    && desired != track_num_out.get() {
-                        return Err(Error::Unknown);
-                    }
+        // If a specific track number was requested, make sure we got it
+        if let Some(desired) = desired_track_num
+            && desired != track_num_out.get() {
+                return Err(Error::Unknown);
+            }
 
-                Ok((self, VideoTrack(track_num_out)))
-            },
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Ok((self, VideoTrack(track_num_out)))
     }
 
     /// Adds a new audio track to this segment, returning its track number.
@@ -194,21 +182,17 @@ impl<W: Write> SegmentBuilder<W> {
             )
         };
 
-        match result {
-            ResultCode::Ok => {
-                let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
+        Error::check_code(result)?;
 
-                // If a specific track number was requested, make sure we got it
-                if let Some(desired) = desired_track_num
-                    && desired != track_num_out.get() {
-                        return Err(Error::Unknown);
-                    }
+        let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
 
-                Ok((self, AudioTrack(track_num_out)))
-            },
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        // If a specific track number was requested, make sure we got it
+        if let Some(desired) = desired_track_num
+            && desired != track_num_out.get() {
+                return Err(Error::Unknown);
+            }
+
+        Ok((self, AudioTrack(track_num_out)))
     }
 
     /// Sets the `CodecPrivate` data for the specified track. If you have a [`VideoTrack`] or [`AudioTrack`], you
@@ -223,12 +207,8 @@ impl<W: Write> SegmentBuilder<W> {
                 data.as_ptr(),
                 len,
             );
-
-            match result {
-                ResultCode::Ok => Ok(self),
-                ResultCode::BadParam => Err(Error::BadParam),
-                _ => Err(Error::Unknown),
-            }
+            Error::check_code(result)?;
+            Ok(self)
         }
     }
 
@@ -257,12 +237,8 @@ impl<W: Write> SegmentBuilder<W> {
                 color_range,
             )
         };
-
-        match result {
-            ResultCode::Ok => Ok(self),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)?;
+        Ok(self)
     }
 
     /// Sets the transfer characteristics (EOTF) for the specified video track.
@@ -282,12 +258,8 @@ impl<W: Write> SegmentBuilder<W> {
                 transfer as u64,
             )
         };
-
-        match result {
-            ResultCode::Ok => Ok(self),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)?;
+        Ok(self)
     }
 
     /// Sets the color primaries for the specified video track.
@@ -303,12 +275,8 @@ impl<W: Write> SegmentBuilder<W> {
         let result = unsafe {
             ffi::mux::mux_set_primaries(self.segment.as_ptr(), track.into(), primaries as u64)
         };
-
-        match result {
-            ResultCode::Ok => Ok(self),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)?;
+        Ok(self)
     }
 
     /// Sets the matrix coefficients for the specified video track.
@@ -328,17 +296,13 @@ impl<W: Write> SegmentBuilder<W> {
                 matrix as u64,
             )
         };
-
-        match result {
-            ResultCode::Ok => Ok(self),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)?;
+        Ok(self)
     }
 
     /// Sets HDR10 static metadata for the specified video track.
     ///
-    /// This includes MaxCLL, MaxFALL, and optionally SMPTE ST 2086 mastering display metadata.
+    /// This includes `MaxCLL`, `MaxFALL`, and optionally SMPTE ST 2086 mastering display metadata.
     #[inline]
     pub fn set_hdr_metadata(
         self,
@@ -349,23 +313,13 @@ impl<W: Write> SegmentBuilder<W> {
         let result = unsafe {
             ffi::mux::mux_set_max_cll(self.segment.as_ptr(), track.into(), metadata.max_cll)
         };
-        if result != ResultCode::Ok {
-            return match result {
-                ResultCode::BadParam => Err(Error::BadParam),
-                _ => Err(Error::Unknown),
-            };
-        }
+        Error::check_code(result)?;
 
         // Set MaxFALL
         let result = unsafe {
             ffi::mux::mux_set_max_fall(self.segment.as_ptr(), track.into(), metadata.max_fall)
         };
-        if result != ResultCode::Ok {
-            return match result {
-                ResultCode::BadParam => Err(Error::BadParam),
-                _ => Err(Error::Unknown),
-            };
-        }
+        Error::check_code(result)?;
 
         // Set mastering metadata if present
         if let Some(mastering) = &metadata.mastering_metadata {
@@ -385,12 +339,7 @@ impl<W: Write> SegmentBuilder<W> {
                     mastering.white_point.y,
                 )
             };
-            if result != ResultCode::Ok {
-                return match result {
-                    ResultCode::BadParam => Err(Error::BadParam),
-                    _ => Err(Error::Unknown),
-                };
-            }
+            Error::check_code(result)?;
         }
 
         Ok(self)
@@ -421,12 +370,8 @@ impl<W: Write> SegmentBuilder<W> {
                 metadata.white_point.y,
             )
         };
-
-        match result {
-            ResultCode::Ok => Ok(self),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)?;
+        Ok(self)
     }
 
     /// Finalizes track information and makes the segment ready to accept video/audio frames.
@@ -434,10 +379,7 @@ impl<W: Write> SegmentBuilder<W> {
     #[inline]
     pub fn build(self) -> Segment<W> {
         let Self { segment, writer } = self;
-        Segment {
-            ffi: segment,
-            writer,
-        }
+        Segment { ffi: segment, writer }
     }
 }
 
@@ -494,12 +436,7 @@ impl<W: Write> Segment<W> {
                 keyframe,
             )
         };
-
-        match result {
-            ResultCode::Ok => Ok(()),
-            ResultCode::BadParam => Err(Error::BadParam),
-            _ => Err(Error::Unknown),
-        }
+        Error::check_code(result)
     }
 
     /// Finalizes the segment and consumes it, returning the underlying writer. Note that the finalizing process will
