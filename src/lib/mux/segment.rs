@@ -301,11 +301,10 @@ pub struct Segment<W: Write> {
     writer: Writer<W>,
 }
 
-// SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
-// Thus, safety is only conditional on the write destination `W`, hence the `Send` bound on it.
-//
-// `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
-unsafe impl<W: Write + Send> Send for Segment<W> {}
+/// SAFETY: `libwebm` does not contain thread-locals or anything that would violate `Send`-safety.
+///
+/// `libwebm` is not thread-safe, however, which is why we do not implement `Sync`.
+unsafe impl Send for OwnedSegmentPtr {}
 
 impl<W: Write> Segment<W> {
     /// Adds a frame to the track with the specified track number. If you have a [`VideoTrack`] or
