@@ -196,16 +196,215 @@ pub mod mux {
     }
 
     /// A specification for the segment writing mode.
-    /// 
+    ///
     /// This controls how the segment is written and affects features like seeking.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum SegmentMode {
         /// Live mode - optimized for real-time streaming.
         /// In this mode, seeking information may not be available.
         Live,
-        
+
         /// File mode - optimized for file-based playback.
         /// This enables full seeking and duration information.
         File,
+    }
+
+    /// Transfer characteristics (EOTF - Electro-Optical Transfer Function).
+    ///
+    /// Specifies how the video signal values relate to light output.
+    /// See ITU-T H.273 / ISO/IEC 23091-2.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[repr(u64)]
+    pub enum TransferCharacteristics {
+        /// Rec. ITU-R BT.709
+        Bt709 = 1,
+        /// Unspecified
+        Unspecified = 2,
+        /// Rec. ITU-R BT.470-6 System M
+        Bt470M = 4,
+        /// Rec. ITU-R BT.470-6 System B, G
+        Bt470Bg = 5,
+        /// Rec. ITU-R BT.601-7 525 or 625
+        Bt601 = 6,
+        /// SMPTE ST 240
+        Smpte240M = 7,
+        /// Linear transfer characteristics
+        Linear = 8,
+        /// Logarithmic transfer (100:1 range)
+        Log100 = 9,
+        /// Logarithmic transfer (316.22777:1 range)
+        Log316 = 10,
+        /// IEC 61966-2-4
+        Iec61966_2_4 = 11,
+        /// Rec. ITU-R BT.1361-0 extended colour gamut system
+        Bt1361 = 12,
+        /// IEC 61966-2-1 sRGB
+        Iec61966_2_1 = 13,
+        /// Rec. ITU-R BT.2020-2 (10-bit system)
+        Bt2020_10bit = 14,
+        /// Rec. ITU-R BT.2020-2 (12-bit system)
+        Bt2020_12bit = 15,
+        /// SMPTE ST 2084 - Perceptual Quantizer (PQ) for HDR10
+        Smpte2084 = 16,
+        /// SMPTE ST 428-1
+        Smpte428 = 17,
+        /// ARIB STD-B67 - Hybrid Log-Gamma (HLG)
+        AribStdB67 = 18,
+    }
+
+    /// Color primaries specification.
+    ///
+    /// Defines the chromaticity coordinates of the source primaries.
+    /// See ITU-T H.273 / ISO/IEC 23091-2.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[repr(u64)]
+    pub enum ColorPrimaries {
+        /// Rec. ITU-R BT.709
+        Bt709 = 1,
+        /// Unspecified
+        Unspecified = 2,
+        /// Rec. ITU-R BT.470-6 System M
+        Bt470M = 4,
+        /// Rec. ITU-R BT.470-6 System B, G
+        Bt470Bg = 5,
+        /// Rec. ITU-R BT.601-7 525 or 625
+        Bt601 = 6,
+        /// SMPTE ST 240
+        Smpte240M = 7,
+        /// Generic film (colour filters using Illuminant C)
+        Film = 8,
+        /// Rec. ITU-R BT.2020 / BT.2100 - Wide color gamut for HDR
+        Bt2020 = 9,
+        /// SMPTE ST 428-1 (CIE 1931 XYZ)
+        Smpte428 = 10,
+        /// SMPTE RP 431-2 - DCI P3
+        Smpte431 = 11,
+        /// SMPTE EG 432-1 - Display P3
+        Smpte432 = 12,
+        /// EBU Tech. 3213-E
+        Ebu3213 = 22,
+    }
+
+    /// Matrix coefficients for deriving luma and chroma from RGB.
+    ///
+    /// See ITU-T H.273 / ISO/IEC 23091-2.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[repr(u64)]
+    pub enum MatrixCoefficients {
+        /// Identity matrix (RGB)
+        Identity = 0,
+        /// Rec. ITU-R BT.709
+        Bt709 = 1,
+        /// Unspecified
+        Unspecified = 2,
+        /// FCC
+        Fcc = 4,
+        /// Rec. ITU-R BT.470-6 System B, G
+        Bt470Bg = 5,
+        /// Rec. ITU-R BT.601-7 525 or 625
+        Bt601 = 6,
+        /// SMPTE ST 240
+        Smpte240M = 7,
+        /// YCgCo
+        YCgCo = 8,
+        /// Rec. ITU-R BT.2020-2 non-constant luminance
+        Bt2020Ncl = 9,
+        /// Rec. ITU-R BT.2020-2 constant luminance
+        Bt2020Cl = 10,
+        /// SMPTE ST 2085
+        Smpte2085 = 11,
+        /// Chromaticity-derived non-constant luminance
+        ChromaNcl = 12,
+        /// Chromaticity-derived constant luminance
+        ChromaCl = 13,
+        /// ICtCp (Rec. ITU-R BT.2100-0)
+        ICtCp = 14,
+    }
+
+    /// Chromaticity coordinates (CIE 1931 xy).
+    ///
+    /// Values should be in the range 0.0 to 1.0.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct Chromaticity {
+        pub x: f32,
+        pub y: f32,
+    }
+
+    impl Chromaticity {
+        /// D65 white point (standard for BT.709, BT.2020)
+        pub const D65: Self = Self {
+            x: 0.3127,
+            y: 0.3290,
+        };
+    }
+
+    /// Display primaries for HDR mastering metadata.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct DisplayPrimaries {
+        pub red: Chromaticity,
+        pub green: Chromaticity,
+        pub blue: Chromaticity,
+    }
+
+    impl DisplayPrimaries {
+        /// Rec. ITU-R BT.709 primaries (SDR)
+        pub const BT_709: Self = Self {
+            red: Chromaticity { x: 0.64, y: 0.33 },
+            green: Chromaticity { x: 0.30, y: 0.60 },
+            blue: Chromaticity { x: 0.15, y: 0.06 },
+        };
+
+        /// Rec. ITU-R BT.2020 primaries (HDR/WCG)
+        pub const BT_2020: Self = Self {
+            red: Chromaticity { x: 0.708, y: 0.292 },
+            green: Chromaticity { x: 0.170, y: 0.797 },
+            blue: Chromaticity { x: 0.131, y: 0.046 },
+        };
+
+        /// DCI-P3 primaries
+        pub const DCI_P3: Self = Self {
+            red: Chromaticity { x: 0.680, y: 0.320 },
+            green: Chromaticity { x: 0.265, y: 0.690 },
+            blue: Chromaticity { x: 0.150, y: 0.060 },
+        };
+    }
+
+    /// SMPTE ST 2086 mastering display metadata.
+    ///
+    /// Specifies the color volume and luminance range of the display used for mastering HDR content.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct MasteringDisplayMetadata {
+        /// Maximum luminance in candelas per square meter (cd/m² or nits).
+        /// Typical values: 1000.0, 4000.0, 10000.0
+        pub luminance_max: f32,
+
+        /// Minimum luminance in candelas per square meter (cd/m² or nits).
+        /// Typical values: 0.0001, 0.001, 0.01, 0.05
+        pub luminance_min: f32,
+
+        /// Display primaries (red, green, blue chromaticity coordinates)
+        pub primaries: DisplayPrimaries,
+
+        /// White point chromaticity coordinates
+        pub white_point: Chromaticity,
+    }
+
+    /// HDR10 static metadata.
+    ///
+    /// Includes both content light level metadata and mastering display metadata.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct HdrMetadata {
+        /// Maximum Content Light Level in cd/m² (nits).
+        /// The maximum light level of any single pixel in the entire video.
+        /// Typical range: 1000-4000 nits.
+        pub max_cll: u64,
+
+        /// Maximum Frame-Average Light Level in cd/m² (nits).
+        /// The maximum average light level of any single frame in the video.
+        /// Typical range: 100-1000 nits.
+        pub max_fall: u64,
+
+        /// Optional SMPTE ST 2086 mastering metadata.
+        pub mastering_metadata: Option<MasteringDisplayMetadata>,
     }
 }

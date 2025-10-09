@@ -184,11 +184,11 @@ where
 fn sendable() {
     fn is_send<T: Send>(_: &T) {}
 
-    let w = Writer::new(std::io::Cursor::new(vec![1,2,3]));
+    let w = Writer::new(std::io::Cursor::new(vec![1, 2, 3]));
     is_send(&w);
-    assert_eq!([1,2,3], *w.into_inner().into_inner());
+    assert_eq!([1, 2, 3], *w.into_inner().into_inner());
 
-    let w = Writer::new_non_seek(vec![3,4,5]);
+    let w = Writer::new_non_seek(vec![3, 4, 5]);
     is_send(&w);
-    assert_eq!([3,4,5], *w.into_inner());
+    assert_eq!([3, 4, 5], *w.into_inner());
 }
