@@ -213,6 +213,96 @@ extern "C" {
     return success ? ResultCode::Ok : ResultCode::UnknownLibwebmError;
   }
 
+  // HDR10 metadata functions
+  ResultCode mux_set_transfer_characteristics(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t transfer_characteristics) {
+    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
+    auto video = static_cast<MuxVideoTrackPtr>(track);
+
+    mkvmuxer::Colour* colour = video->colour();
+    if(colour == nullptr) { return ResultCode::BadParam; }
+
+    colour->set_transfer_characteristics(transfer_characteristics);
+    return ResultCode::Ok;
+  }
+
+  ResultCode mux_set_primaries(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t primaries) {
+    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
+    auto video = static_cast<MuxVideoTrackPtr>(track);
+
+    mkvmuxer::Colour* colour = video->colour();
+    if(colour == nullptr) { return ResultCode::BadParam; }
+
+    colour->set_primaries(primaries);
+    return ResultCode::Ok;
+  }
+
+  ResultCode mux_set_matrix_coefficients(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t matrix_coefficients) {
+    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
+    auto video = static_cast<MuxVideoTrackPtr>(track);
+
+    mkvmuxer::Colour* colour = video->colour();
+    if(colour == nullptr) { return ResultCode::BadParam; }
+
+    colour->set_matrix_coefficients(matrix_coefficients);
+    return ResultCode::Ok;
+  }
+
+  ResultCode mux_set_max_cll(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t max_cll) {
+    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
+    auto video = static_cast<MuxVideoTrackPtr>(track);
+
+    mkvmuxer::Colour* colour = video->colour();
+    if(colour == nullptr) { return ResultCode::BadParam; }
+
+    colour->set_max_cll(max_cll);
+    return ResultCode::Ok;
+  }
+
+  ResultCode mux_set_max_fall(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t max_fall) {
+    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
+    auto video = static_cast<MuxVideoTrackPtr>(track);
+
+    mkvmuxer::Colour* colour = video->colour();
+    if(colour == nullptr) { return ResultCode::BadParam; }
+
+    colour->set_max_fall(max_fall);
+    return ResultCode::Ok;
+  }
+
+  ResultCode mux_set_mastering_metadata(MuxSegmentPtr segment, TrackNum video_track_num,
+                                        float luminance_max, float luminance_min,
+                                        float red_x, float red_y,
+                                        float green_x, float green_y,
+                                        float blue_x, float blue_y,
+                                        float white_x, float white_y) {
+    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
+    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
+    auto video = static_cast<MuxVideoTrackPtr>(track);
+
+    mkvmuxer::Colour* colour = video->colour();
+    if(colour == nullptr) { return ResultCode::BadParam; }
+
+    mkvmuxer::MasteringMetadata mastering_metadata;
+    mastering_metadata.set_luminance_max(luminance_max);
+    mastering_metadata.set_luminance_min(luminance_min);
+
+    mkvmuxer::PrimaryChromaticity r(red_x, red_y);
+    mkvmuxer::PrimaryChromaticity g(green_x, green_y);
+    mkvmuxer::PrimaryChromaticity b(blue_x, blue_y);
+    mkvmuxer::PrimaryChromaticity wp(white_x, white_y);
+
+    bool success = mastering_metadata.SetChromaticity(&r, &g, &b, &wp);
+    if(!success) { return ResultCode::UnknownLibwebmError; }
+
+    success = colour->SetMasteringMetadata(mastering_metadata);
+    return success ? ResultCode::Ok : ResultCode::UnknownLibwebmError;
+  }
+
   ResultCode mux_segment_add_frame(MuxSegmentPtr segment, TrackNum track_num,
                              const uint8_t* frame, const size_t length,
                              const uint64_t timestamp_ns, const bool keyframe) {

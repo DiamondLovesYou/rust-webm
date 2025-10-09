@@ -78,6 +78,59 @@ pub mod mux {
             sampling_vert: u8,
             color_range: u8,
         ) -> ResultCode;
+
+        // HDR10 metadata functions
+        #[link_name = "mux_set_transfer_characteristics"]
+        pub fn mux_set_transfer_characteristics(
+            segment: SegmentMutPtr,
+            video_track_num: TrackNum,
+            transfer_characteristics: u64,
+        ) -> ResultCode;
+
+        #[link_name = "mux_set_primaries"]
+        pub fn mux_set_primaries(
+            segment: SegmentMutPtr,
+            video_track_num: TrackNum,
+            primaries: u64,
+        ) -> ResultCode;
+
+        #[link_name = "mux_set_matrix_coefficients"]
+        pub fn mux_set_matrix_coefficients(
+            segment: SegmentMutPtr,
+            video_track_num: TrackNum,
+            matrix_coefficients: u64,
+        ) -> ResultCode;
+
+        #[link_name = "mux_set_max_cll"]
+        pub fn mux_set_max_cll(
+            segment: SegmentMutPtr,
+            video_track_num: TrackNum,
+            max_cll: u64,
+        ) -> ResultCode;
+
+        #[link_name = "mux_set_max_fall"]
+        pub fn mux_set_max_fall(
+            segment: SegmentMutPtr,
+            video_track_num: TrackNum,
+            max_fall: u64,
+        ) -> ResultCode;
+
+        #[link_name = "mux_set_mastering_metadata"]
+        pub fn mux_set_mastering_metadata(
+            segment: SegmentMutPtr,
+            video_track_num: TrackNum,
+            luminance_max: f32,
+            luminance_min: f32,
+            red_x: f32,
+            red_y: f32,
+            green_x: f32,
+            green_y: f32,
+            blue_x: f32,
+            blue_y: f32,
+            white_x: f32,
+            white_y: f32,
+        ) -> ResultCode;
+
         #[link_name = "mux_set_writing_app"]
         pub fn mux_set_writing_app(segment: SegmentMutPtr, name: *const c_char);
         #[link_name = "mux_finalize_segment"]

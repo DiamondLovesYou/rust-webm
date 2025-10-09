@@ -6,8 +6,9 @@ use crate::ffi;
 use crate::ffi::mux::{ResultCode, TrackNum};
 
 use super::{
-    writer::Writer, AudioCodecId, AudioTrack, ColorRange, ColorSubsampling, Error, SegmentMode, VideoCodecId,
-    VideoTrack,
+    AudioCodecId, AudioTrack, ColorPrimaries, ColorRange, ColorSubsampling, Error, HdrMetadata,
+    MasteringDisplayMetadata, MatrixCoefficients, SegmentMode, TransferCharacteristics,
+    VideoCodecId, VideoTrack, writer::Writer,
 };
 
 /// RAII semantics for an FFI segment. This is simpler than implementing `Drop` on [`Segment`], which
@@ -77,7 +78,7 @@ impl<W: Write> SegmentBuilder<W> {
     }
 
     /// Sets the segment writing mode.
-    /// 
+    ///
     /// - [`SegmentMode::Live`] - Optimized for real-time streaming. Seeking information may not be available.
     /// - [`SegmentMode::File`] - Optimized for file-based playback. Enables full seeking and duration information.
     #[inline]
@@ -87,9 +88,7 @@ impl<W: Write> SegmentBuilder<W> {
             SegmentMode::File => ffi::mux::SEGMENT_MODE_FILE,
         };
 
-        let result = unsafe {
-            ffi::mux::segment_set_mode(self.segment.as_ptr(), mode_value)
-        };
+        let result = unsafe { ffi::mux::segment_set_mode(self.segment.as_ptr(), mode_value) };
 
         match result {
             ResultCode::Ok => Ok(self),
@@ -256,6 +255,170 @@ impl<W: Write> SegmentBuilder<W> {
                 subsampling.chroma_horizontal,
                 subsampling.chroma_vertical,
                 color_range,
+            )
+        };
+
+        match result {
+            ResultCode::Ok => Ok(self),
+            ResultCode::BadParam => Err(Error::BadParam),
+            _ => Err(Error::Unknown),
+        }
+    }
+
+    /// Sets the transfer characteristics (EOTF) for the specified video track.
+    ///
+    /// This specifies how the video signal values relate to light output.
+    /// Use [`TransferCharacteristics::Smpte2084`] for HDR10 content.
+    #[inline]
+    pub fn set_transfer_characteristics(
+        self,
+        track: VideoTrack,
+        transfer: TransferCharacteristics,
+    ) -> Result<Self, Error> {
+        let result = unsafe {
+            ffi::mux::mux_set_transfer_characteristics(
+                self.segment.as_ptr(),
+                track.into(),
+                transfer as u64,
+            )
+        };
+
+        match result {
+            ResultCode::Ok => Ok(self),
+            ResultCode::BadParam => Err(Error::BadParam),
+            _ => Err(Error::Unknown),
+        }
+    }
+
+    /// Sets the color primaries for the specified video track.
+    ///
+    /// This defines the chromaticity coordinates of the source primaries.
+    /// Use [`ColorPrimaries::Bt2020`] for HDR/wide color gamut content.
+    #[inline]
+    pub fn set_primaries(
+        self,
+        track: VideoTrack,
+        primaries: ColorPrimaries,
+    ) -> Result<Self, Error> {
+        let result = unsafe {
+            ffi::mux::mux_set_primaries(self.segment.as_ptr(), track.into(), primaries as u64)
+        };
+
+        match result {
+            ResultCode::Ok => Ok(self),
+            ResultCode::BadParam => Err(Error::BadParam),
+            _ => Err(Error::Unknown),
+        }
+    }
+
+    /// Sets the matrix coefficients for the specified video track.
+    ///
+    /// This specifies how to derive luma and chroma from RGB.
+    /// Use [`MatrixCoefficients::Bt2020Ncl`] for HDR content.
+    #[inline]
+    pub fn set_matrix_coefficients(
+        self,
+        track: VideoTrack,
+        matrix: MatrixCoefficients,
+    ) -> Result<Self, Error> {
+        let result = unsafe {
+            ffi::mux::mux_set_matrix_coefficients(
+                self.segment.as_ptr(),
+                track.into(),
+                matrix as u64,
+            )
+        };
+
+        match result {
+            ResultCode::Ok => Ok(self),
+            ResultCode::BadParam => Err(Error::BadParam),
+            _ => Err(Error::Unknown),
+        }
+    }
+
+    /// Sets HDR10 static metadata for the specified video track.
+    ///
+    /// This includes MaxCLL, MaxFALL, and optionally SMPTE ST 2086 mastering display metadata.
+    #[inline]
+    pub fn set_hdr_metadata(
+        self,
+        track: VideoTrack,
+        metadata: &HdrMetadata,
+    ) -> Result<Self, Error> {
+        // Set MaxCLL
+        let result = unsafe {
+            ffi::mux::mux_set_max_cll(self.segment.as_ptr(), track.into(), metadata.max_cll)
+        };
+        if result != ResultCode::Ok {
+            return match result {
+                ResultCode::BadParam => Err(Error::BadParam),
+                _ => Err(Error::Unknown),
+            };
+        }
+
+        // Set MaxFALL
+        let result = unsafe {
+            ffi::mux::mux_set_max_fall(self.segment.as_ptr(), track.into(), metadata.max_fall)
+        };
+        if result != ResultCode::Ok {
+            return match result {
+                ResultCode::BadParam => Err(Error::BadParam),
+                _ => Err(Error::Unknown),
+            };
+        }
+
+        // Set mastering metadata if present
+        if let Some(mastering) = &metadata.mastering_metadata {
+            let result = unsafe {
+                ffi::mux::mux_set_mastering_metadata(
+                    self.segment.as_ptr(),
+                    track.into(),
+                    mastering.luminance_max,
+                    mastering.luminance_min,
+                    mastering.primaries.red.x,
+                    mastering.primaries.red.y,
+                    mastering.primaries.green.x,
+                    mastering.primaries.green.y,
+                    mastering.primaries.blue.x,
+                    mastering.primaries.blue.y,
+                    mastering.white_point.x,
+                    mastering.white_point.y,
+                )
+            };
+            if result != ResultCode::Ok {
+                return match result {
+                    ResultCode::BadParam => Err(Error::BadParam),
+                    _ => Err(Error::Unknown),
+                };
+            }
+        }
+
+        Ok(self)
+    }
+
+    /// Sets SMPTE ST 2086 mastering display metadata for the specified video track.
+    ///
+    /// This specifies the color volume and luminance range of the display used for mastering HDR content.
+    #[inline]
+    pub fn set_mastering_metadata(
+        self,
+        track: VideoTrack,
+        metadata: &MasteringDisplayMetadata,
+    ) -> Result<Self, Error> {
+        let result = unsafe {
+            ffi::mux::mux_set_mastering_metadata(
+                self.segment.as_ptr(),
+                track.into(),
+                metadata.luminance_max,
+                metadata.luminance_min,
+                metadata.primaries.red.x,
+                metadata.primaries.red.y,
+                metadata.primaries.green.x,
+                metadata.primaries.green.y,
+                metadata.primaries.blue.x,
+                metadata.primaries.blue.y,
+                metadata.white_point.x,
+                metadata.white_point.y,
             )
         };
 
