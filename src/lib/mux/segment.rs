@@ -573,10 +573,12 @@ mod tests {
     fn overlapping_track_number_different_type() {
         let builder = make_segment_builder();
 
-        let Ok((builder, _)) = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(123))
-        else {
-            panic!("First video track unexpectedly failed")
-        };
+        let (builder, vid) = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(123))
+            .expect("First video track failed");
+
+        let builder = builder
+            .set_transfer_characteristics(vid, TransferCharacteristics::Bt709).unwrap()
+            .set_primaries(vid, ColorPrimaries::Bt709).unwrap();
 
         let audio_track = builder.add_audio_track(420, 420, AudioCodecId::Opus, Some(123));
         assert!(audio_track.is_err());
