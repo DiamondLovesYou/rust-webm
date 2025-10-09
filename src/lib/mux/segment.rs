@@ -134,7 +134,7 @@ impl<W: Write> SegmentBuilder<W> {
                 height,
                 requested_track_num,
                 codec.get_id(),
-                &mut track_num_out,
+                &raw mut track_num_out,
             )
         };
 
@@ -143,11 +143,10 @@ impl<W: Write> SegmentBuilder<W> {
                 let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
 
                 // If a specific track number was requested, make sure we got it
-                if let Some(desired) = desired_track_num {
-                    if desired != track_num_out.get() {
+                if let Some(desired) = desired_track_num
+                    && desired != track_num_out.get() {
                         return Err(Error::Unknown);
                     }
-                }
 
                 Ok((self, VideoTrack(track_num_out)))
             },
@@ -192,7 +191,7 @@ impl<W: Write> SegmentBuilder<W> {
                 channels,
                 requested_track_num,
                 codec.get_id(),
-                &mut track_num_out,
+                &raw mut track_num_out,
             )
         };
 
@@ -201,11 +200,10 @@ impl<W: Write> SegmentBuilder<W> {
                 let track_num_out = NonZeroU64::new(track_num_out).ok_or(Error::Unknown)?;
 
                 // If a specific track number was requested, make sure we got it
-                if let Some(desired) = desired_track_num {
-                    if desired != track_num_out.get() {
+                if let Some(desired) = desired_track_num
+                    && desired != track_num_out.get() {
                         return Err(Error::Unknown);
                     }
-                }
 
                 Ok((self, AudioTrack(track_num_out)))
             },
