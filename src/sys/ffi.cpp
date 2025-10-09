@@ -214,7 +214,7 @@ extern "C" {
   }
 
   // HDR10 metadata functions
-  ResultCode mux_set_transfer_characteristics(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t transfer_characteristics) {
+  static ResultCode get_or_create_colour(MuxSegmentPtr segment, TrackNum video_track_num, mkvmuxer::Colour** colour_out) {
     MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
     if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
     auto video = static_cast<MuxVideoTrackPtr>(track);
@@ -227,78 +227,51 @@ extern "C" {
       colour = video->colour();
       if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
     }
+
+    *colour_out = colour;
+    return ResultCode::Ok;
+  }
+
+  ResultCode mux_set_transfer_characteristics(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t transfer_characteristics) {
+    mkvmuxer::Colour* colour = nullptr;
+    ResultCode result = get_or_create_colour(segment, video_track_num, &colour);
+    if(result != ResultCode::Ok) { return result; }
 
     colour->set_transfer_characteristics(transfer_characteristics);
     return ResultCode::Ok;
   }
 
   ResultCode mux_set_primaries(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t primaries) {
-    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
-    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
-    auto video = static_cast<MuxVideoTrackPtr>(track);
-
-    mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) {
-      // Create a default Colour object to initialize the track
-      mkvmuxer::Colour default_colour;
-      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
-      colour = video->colour();
-      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
-    }
+    mkvmuxer::Colour* colour = nullptr;
+    ResultCode result = get_or_create_colour(segment, video_track_num, &colour);
+    if(result != ResultCode::Ok) { return result; }
 
     colour->set_primaries(primaries);
     return ResultCode::Ok;
   }
 
   ResultCode mux_set_matrix_coefficients(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t matrix_coefficients) {
-    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
-    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
-    auto video = static_cast<MuxVideoTrackPtr>(track);
-
-    mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) {
-      // Create a default Colour object to initialize the track
-      mkvmuxer::Colour default_colour;
-      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
-      colour = video->colour();
-      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
-    }
+    mkvmuxer::Colour* colour = nullptr;
+    ResultCode result = get_or_create_colour(segment, video_track_num, &colour);
+    if(result != ResultCode::Ok) { return result; }
 
     colour->set_matrix_coefficients(matrix_coefficients);
     return ResultCode::Ok;
   }
 
   ResultCode mux_set_max_cll(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t max_cll) {
-    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
-    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
-    auto video = static_cast<MuxVideoTrackPtr>(track);
-
-    mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) {
-      // Create a default Colour object to initialize the track
-      mkvmuxer::Colour default_colour;
-      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
-      colour = video->colour();
-      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
-    }
+    mkvmuxer::Colour* colour = nullptr;
+    ResultCode result = get_or_create_colour(segment, video_track_num, &colour);
+    if(result != ResultCode::Ok) { return result; }
 
     colour->set_max_cll(max_cll);
     return ResultCode::Ok;
   }
 
   ResultCode mux_set_max_fall(MuxSegmentPtr segment, TrackNum video_track_num, uint64_t max_fall) {
-    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
-    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
-    auto video = static_cast<MuxVideoTrackPtr>(track);
-
-    mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) {
-      // Create a default Colour object to initialize the track
-      mkvmuxer::Colour default_colour;
-      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
-      colour = video->colour();
-      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
-    }
+    mkvmuxer::Colour* colour = nullptr;
+    ResultCode result = get_or_create_colour(segment, video_track_num, &colour);
+    if(result != ResultCode::Ok) { return result; }
 
     colour->set_max_fall(max_fall);
     return ResultCode::Ok;
@@ -310,18 +283,9 @@ extern "C" {
                                         float green_x, float green_y,
                                         float blue_x, float blue_y,
                                         float white_x, float white_y) {
-    MuxTrackPtr track = segment->GetTrackByNumber(video_track_num);
-    if(track == nullptr || track->type() != mkvmuxer::Tracks::kVideo) { return ResultCode::BadParam; }
-    auto video = static_cast<MuxVideoTrackPtr>(track);
-
-    mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) {
-      // Create a default Colour object to initialize the track
-      mkvmuxer::Colour default_colour;
-      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
-      colour = video->colour();
-      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
-    }
+    mkvmuxer::Colour* colour = nullptr;
+    ResultCode result = get_or_create_colour(segment, video_track_num, &colour);
+    if(result != ResultCode::Ok) { return result; }
 
     mkvmuxer::MasteringMetadata mastering_metadata;
     mastering_metadata.set_luminance_max(luminance_max);
