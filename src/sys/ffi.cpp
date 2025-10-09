@@ -220,7 +220,13 @@ extern "C" {
     auto video = static_cast<MuxVideoTrackPtr>(track);
 
     mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) { return ResultCode::BadParam; }
+    if(colour == nullptr) {
+      // Create a default Colour object to initialize the track
+      mkvmuxer::Colour default_colour;
+      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
+      colour = video->colour();
+      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
+    }
 
     colour->set_transfer_characteristics(transfer_characteristics);
     return ResultCode::Ok;
@@ -232,7 +238,13 @@ extern "C" {
     auto video = static_cast<MuxVideoTrackPtr>(track);
 
     mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) { return ResultCode::BadParam; }
+    if(colour == nullptr) {
+      // Create a default Colour object to initialize the track
+      mkvmuxer::Colour default_colour;
+      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
+      colour = video->colour();
+      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
+    }
 
     colour->set_primaries(primaries);
     return ResultCode::Ok;
@@ -244,7 +256,13 @@ extern "C" {
     auto video = static_cast<MuxVideoTrackPtr>(track);
 
     mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) { return ResultCode::BadParam; }
+    if(colour == nullptr) {
+      // Create a default Colour object to initialize the track
+      mkvmuxer::Colour default_colour;
+      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
+      colour = video->colour();
+      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
+    }
 
     colour->set_matrix_coefficients(matrix_coefficients);
     return ResultCode::Ok;
@@ -256,7 +274,13 @@ extern "C" {
     auto video = static_cast<MuxVideoTrackPtr>(track);
 
     mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) { return ResultCode::BadParam; }
+    if(colour == nullptr) {
+      // Create a default Colour object to initialize the track
+      mkvmuxer::Colour default_colour;
+      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
+      colour = video->colour();
+      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
+    }
 
     colour->set_max_cll(max_cll);
     return ResultCode::Ok;
@@ -268,7 +292,13 @@ extern "C" {
     auto video = static_cast<MuxVideoTrackPtr>(track);
 
     mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) { return ResultCode::BadParam; }
+    if(colour == nullptr) {
+      // Create a default Colour object to initialize the track
+      mkvmuxer::Colour default_colour;
+      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
+      colour = video->colour();
+      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
+    }
 
     colour->set_max_fall(max_fall);
     return ResultCode::Ok;
@@ -285,7 +315,13 @@ extern "C" {
     auto video = static_cast<MuxVideoTrackPtr>(track);
 
     mkvmuxer::Colour* colour = video->colour();
-    if(colour == nullptr) { return ResultCode::BadParam; }
+    if(colour == nullptr) {
+      // Create a default Colour object to initialize the track
+      mkvmuxer::Colour default_colour;
+      if(!video->SetColour(default_colour)) { return ResultCode::UnknownLibwebmError; }
+      colour = video->colour();
+      if(colour == nullptr) { return ResultCode::UnknownLibwebmError; }
+    }
 
     mkvmuxer::MasteringMetadata mastering_metadata;
     mastering_metadata.set_luminance_max(luminance_max);
