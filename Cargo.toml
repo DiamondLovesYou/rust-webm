@@ -1,8 +1,8 @@
 [package]
-version = "2.2.0"
+version = "2.2.1"
 authors = [
-    "Sean Oxley <sean.oxley@bibo.com.ph>",
     "Kornel Lesiński <kornel@geekhood.net>",
+    "Sean Oxley <sean.oxley@bibo.com.ph>",
     "Richard Diamond <wichard@vitalitystudios.com>",
 ]
 description = "Rust idiomatic wrapper to libwebm"
@@ -17,7 +17,7 @@ edition = "2024"
 include = ["README.md", "LICENSE.TXT", "src/lib/**"]
 
 [dependencies]
-webm-sys = { version = "2.2.0", path = "src/sys" }
+webm-sys = { version = "2.2.1", path = "src/sys" }
 
 [lib]
 name = "webm"

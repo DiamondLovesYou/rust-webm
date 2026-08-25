@@ -1,4 +1,4 @@
-//! A crate for muxing one or more video/audio streams into a WebM file.
+//! A crate for muxing one or more video/audio streams into a `WebM` file.
 //!
 //! Note that this crate is only for muxing media that has already been encoded with the appropriate codec.
 //! Consider a crate such as `vpx` if you need encoding as well.
@@ -8,7 +8,7 @@
 //! a [`mux::Writer`], you create a [`mux::SegmentBuilder`] and add the tracks you need. Finally, you create a
 //! [`mux::Segment`] with that builder, to which you can add media frames.
 //!
-//! In typical usage of this library, where you might mux to a WebM file, you would do:
+//! In typical usage of this library, where you might mux to a `WebM` file, you would do:
 //! ```no_run
 //! use std::fs::File;
 //! use webm::mux::{SegmentBuilder, SegmentMode, VideoCodecId, Writer};
@@ -313,7 +313,7 @@ pub mod mux {
         Bt601 = 6,
         /// SMPTE ST 240
         Smpte240M = 7,
-        /// YCgCo
+        /// `YCgCo`
         YCgCo = 8,
         /// Rec. ITU-R BT.2020-2 non-constant luminance
         Bt2020Ncl = 9,
@@ -325,7 +325,7 @@ pub mod mux {
         ChromaNcl = 12,
         /// Chromaticity-derived constant luminance
         ChromaCl = 13,
-        /// ICtCp (Rec. ITU-R BT.2100-0)
+        /// `ICtCp` (Rec. ITU-R BT.2100-0)
         ICtCp = 14,
     }
 

@@ -41,10 +41,10 @@ impl Drop for OwnedWriterPtr {
     }
 }
 
-/// Structure for writing a muxed WebM stream to the user-supplied write destination `T`.
+/// Structure for writing a muxed `WebM` stream to the user-supplied write destination `T`.
 ///
 /// `T` may be a file, an `std::io::Cursor` over a byte array, or anything implementing the [`Write`] trait.
-/// It is recommended, but not required, that `T` also implement [`Seek`]. This allows the resulting WebM
+/// It is recommended, but not required, that `T` also implement [`Seek`]. This allows the resulting `WebM`
 /// file to have things like seeking headers and a stream duration known upfront.
 ///
 /// Once this [`Writer`] is created, you can use it to create one or more [`Segment`](crate::mux::Segment)s.

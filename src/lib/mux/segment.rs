@@ -399,7 +399,7 @@ impl<W: Write> std::fmt::Debug for SegmentBuilder<W> {
 ///
 /// ## Finalization
 /// Once you are done writing frames to this segment, you must call [`Segment::finalize`] on it.
-/// This performs a few final writes, and the resulting WebM may not be playable without it.
+/// This performs a few final writes, and the resulting `WebM` may not be playable without it.
 /// Notably, for memory safety reasons, just dropping a [`Segment`] will not finalize it!
 pub struct Segment<W: Write> {
     ffi: OwnedSegmentPtr,
@@ -442,7 +442,7 @@ impl<W: Write> Segment<W> {
     /// Finalizes the segment and consumes it, returning the underlying writer. Note that the finalizing process will
     /// itself trigger writes (such as to write seeking information).
     ///
-    /// The resulting WebM may not be playable if you drop the [`Segment`] without calling this first!
+    /// The resulting `WebM` may not be playable if you drop the [`Segment`] without calling this first!
     ///
     /// You may specify an explicit `duration` to be written to the segment's `Duration` element. However, this requires
     /// seeking and thus will be ignored if the writer was not created with [`Seek`](std::io::Seek) support.
