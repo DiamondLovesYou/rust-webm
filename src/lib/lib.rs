@@ -11,26 +11,29 @@
 //! In typical usage of this library, where you might mux to a `WebM` file, you would do:
 //! ```no_run
 //! use std::fs::File;
-//! use webm::mux::{SegmentBuilder, SegmentMode, VideoCodecId, Writer};
+//! use webm::mux::{Error, SegmentBuilder, SegmentMode, VideoCodecId, Writer};
 //!
-//! let file = File::open("./my-cool-file.webm").unwrap();
-//! let writer = Writer::new(file);
+//! fn main() -> Result<(), Error> {
+//!     let file = File::create("./my-cool-file.webm").map_err(|_| Error::Unknown)?;
+//!     let writer = Writer::new(file);
 //!
-//! // Build a segment with a single video track
-//! let builder = SegmentBuilder::new(writer).unwrap();
-//! let builder = builder.set_mode(SegmentMode::Live).unwrap(); // Set live mode for streaming
-//! let (builder, video_track) = builder.add_video_track(640, 480, VideoCodecId::VP8, None).unwrap();
-//! let mut segment = builder.build();
+//!     // Build a segment with a single video track
+//!     let builder = SegmentBuilder::new(writer)?;
+//!     let builder = builder.set_mode(SegmentMode::Live)?; // Set live mode for streaming
+//!     let (builder, video_track) = builder.add_video_track(640, 480, VideoCodecId::VP8, None)?;
+//!     let mut segment = builder.build();
 //!
-//! // Add some video frames
-//! let encoded_video_frame: &[u8] = &[]; // TODO: Your video data here
-//! let timestamp_ns = 0;
-//! let is_keyframe = true;
-//! segment.add_frame(video_track, encoded_video_frame, timestamp_ns, is_keyframe).unwrap();
-//! // TODO: More video frames
+//!     // Add some video frames
+//!     let encoded_video_frame: &[u8] = &[]; // TODO: Your video data here
+//!     let timestamp_ns = 0;
+//!     let is_keyframe = true;
+//!     segment.add_frame(video_track, encoded_video_frame, timestamp_ns, is_keyframe)?;
+//!     // TODO: More video frames
 //!
-//! // Done writing frames, finish off the file
-//! _ = segment.finalize(None).inspect_err(|_| eprintln!("Could not finalize WebM file"));
+//!     // Done writing frames, finish off the file
+//!     segment.finalize(None).map_err(|_| Error::Unknown)?;
+//!     Ok(())
+//! }
 //! ```
 
 use webm_sys as ffi;

@@ -48,11 +48,8 @@ impl Drop for OwnedWriterPtr {
 /// file to have things like seeking headers and a stream duration known upfront.
 ///
 /// Once this [`Writer`] is created, you can use it to create one or more [`Segment`](crate::mux::Segment)s.
-pub struct Writer<T>
-where
-    T: Write,
-{
-    writer_data: Pin<Box<MuxWriterData<T>>>,
+pub struct Writer<W: Write> {
+    writer_data: Pin<Box<MuxWriterData<W>>>,
     mkv_writer: OwnedWriterPtr,
 }
 
@@ -75,8 +72,8 @@ where
         extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64 {
             // The user-supplied writer does not track its own position.
             // Use our own based on how much has been written
-            let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
-            data.bytes_written
+            let data = unsafe { data.cast::<MuxWriterData<T>>().as_ref() };
+            data.map_or(0, |d| d.bytes_written)
         }
 
         Self::make_writer(dest, get_pos_fn::<T>, None)
@@ -97,32 +94,23 @@ where
         self.mkv_writer.as_ptr()
     }
 
-    fn make_writer(
-        dest: T,
-        get_pos_fn: WriterGetPosFn,
-        set_pos_fn: Option<WriterSetPosFn>,
-    ) -> Self {
-        extern "C" fn write_fn<T>(data: *mut c_void, buf: *const c_void, len: usize) -> bool
-        where
-            T: Write,
-        {
+    fn make_writer(dest: T, get_pos_fn: WriterGetPosFn, set_pos_fn: Option<WriterSetPosFn>) -> Self {
+        extern "C" fn write_fn<T>(data: *mut c_void, buf: *const c_void, len: usize) -> bool where T: Write {
+            let Some(data) = (unsafe { data.cast::<MuxWriterData<T>>().as_mut() }) else {
+                return false;
+            };
+
             if buf.is_null() {
                 return false;
             }
-            let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
             let buf = unsafe { std::slice::from_raw_parts(buf.cast::<u8>(), len) };
 
-            let result = data.dest.write(buf);
-            if let Ok(num_bytes) = result {
-                // Guard against a future universe where sizeof(usize) > sizeof(u64)
-                let num_bytes_u64: u64 = num_bytes.try_into().unwrap();
-
-                data.bytes_written += num_bytes_u64;
-
-                // Partial writes are considered failure
-                num_bytes == len
-            } else {
-                false
+            match data.dest.write_all(buf) {
+                Ok(()) => {
+                    data.bytes_written += buf.len() as u64;
+                    true
+                },
+                Err(_) => false,
             }
         }
 
@@ -131,20 +119,20 @@ where
             bytes_written: 0,
             _marker: PhantomPinned,
         });
+
         let mkv_writer = unsafe {
-            ffi::mux::new_writer(
+            NonNull::new(ffi::mux::new_writer(
                 Some(write_fn::<T>),
                 Some(get_pos_fn),
                 set_pos_fn,
                 None,
                 std::ptr::from_mut(writer_data.as_mut().get_unchecked_mut()).cast(),
-            )
+            )).expect("mux::new_writer")
         };
-        assert!(!mkv_writer.is_null());
 
         Self {
             writer_data,
-            mkv_writer: unsafe { OwnedWriterPtr::new(NonNull::new(mkv_writer).unwrap()) },
+            mkv_writer: unsafe { OwnedWriterPtr::new(mkv_writer) },
         }
     }
 }
@@ -156,23 +144,20 @@ where
     /// Creates a [`Writer`] for a destination that supports [`Seek`].
     /// If it does not support [`Seek`], you should use [`Writer::new_non_seek()`] instead.
     ///
-    /// You can use `io::Cursor::new(Vec::new())` for in-memory writing, or `BufReader::new(File)`.
+    /// You can use `io::Cursor::new(Vec::new())` for in-memory writing, or `BufWriter::new(File)`.
     #[inline]
     pub fn new(dest: T) -> Self {
         use std::io::SeekFrom;
 
-        extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64
-        where
-            T: Write + Seek,
-        {
-            let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
-            data.dest.stream_position().unwrap()
+        extern "C" fn get_pos_fn<T>(data: *mut c_void) -> u64 where T: Write + Seek {
+            let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut() };
+            data.and_then(|d| d.dest.stream_position().ok()).unwrap_or(!0)
         }
-        extern "C" fn set_pos_fn<T>(data: *mut c_void, pos: u64) -> bool
-        where
-            T: Write + Seek,
-        {
-            let data = unsafe { data.cast::<MuxWriterData<T>>().as_mut().unwrap() };
+
+        extern "C" fn set_pos_fn<T>(data: *mut c_void, pos: u64) -> bool where T: Write + Seek {
+            let Some(data) = (unsafe { data.cast::<MuxWriterData<T>>().as_mut() }) else {
+                return false;
+            };
             data.dest.seek(SeekFrom::Start(pos)).is_ok()
         }
 
