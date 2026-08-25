@@ -96,6 +96,8 @@ impl<W: Write> SegmentBuilder<W> {
     /// method succeeds, the returned track number is guaranteed to match the requested one. If a track with that
     /// number already exists, however, this method will fail. Leave as `None` to allow an available number to be
     /// chosen for you.
+    ///
+    /// Track numbers must be in the range `1..=126` (libwebm's limit)
     pub fn add_video_track(
         self,
         width: u32,
@@ -107,7 +109,9 @@ impl<W: Write> SegmentBuilder<W> {
 
         // Zero is not a valid track number, and to libwebm means "choose one for me".
         // If this is the user's intent, they should instead pass `None`.
-        if desired_track_num == Some(0) {
+        //
+        // libwebm only supports track numbers in the range [1, 126].
+        if desired_track_num.is_some_and(|n| n == 0 || n > 126) {
             return Err(Error::BadParam);
         }
 
@@ -148,6 +152,8 @@ impl<W: Write> SegmentBuilder<W> {
     /// method succeeds, the returned track number is guaranteed to match the requested one. If a track with that
     /// number already exists, however, this method will fail. Leave as `None` to allow an available number to be
     /// chosen for you.
+    ///
+    /// Track numbers must be in the range `1..=126`
     pub fn add_audio_track(
         self,
         sample_rate: u32,
@@ -159,7 +165,7 @@ impl<W: Write> SegmentBuilder<W> {
 
         // Zero is not a valid track number, and to libwebm means "choose one for me".
         // If this is the user's intent, they should instead pass `None`.
-        if desired_track_num == Some(0) {
+        if desired_track_num.is_some_and(|n| n == 0 || n > 126) {
             return Err(Error::BadParam);
         }
 
@@ -491,6 +497,26 @@ mod tests {
         let builder = make_segment_builder();
         let video_track = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(123456));
         assert!(video_track.is_err());
+    }
+
+    #[test]
+    fn track_number_out_of_range() {
+        let builder = make_segment_builder();
+        let video_track = builder.add_video_track(420, 420, VideoCodecId::VP8, Some(127));
+        assert!(matches!(video_track, Err(Error::BadParam)));
+
+        let builder = make_segment_builder();
+        let audio_track = builder.add_audio_track(420, 420, AudioCodecId::Opus, Some(127));
+        assert!(matches!(audio_track, Err(Error::BadParam)));
+    }
+
+    #[test]
+    fn track_number_upper_bound_accepted() {
+        let builder = make_segment_builder();
+        let (_, track) = builder
+            .add_video_track(420, 420, VideoCodecId::VP8, Some(126))
+            .expect("track number 126 should be accepted");
+        assert_eq!(TrackNum::from(track), 126);
     }
 
     #[test]
