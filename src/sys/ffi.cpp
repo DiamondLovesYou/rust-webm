@@ -7,7 +7,8 @@
 #include "libwebm/mkvparser/mkvreader.h"
 #include "libwebm/common/webmids.h"
 
-#include <stdint.h>
+#include <cstdint>
+#include <cstddef>
 #include <assert.h>
 
 extern "C" {
